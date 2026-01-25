@@ -1,0 +1,95 @@
+/* Page background */
+.login-page {
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5f7fa;
+  font-family:
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+}
+
+/* Card */
+.login-card {
+  width: 100%;
+  max-width: 380px;
+  background: #ffffff;
+  padding: 2.5rem;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+}
+
+/* Title */
+.login-title {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 600;
+  color: #111827;
+}
+
+/* Subtitle */
+.login-subtitle {
+  margin: 0.5rem 0 2rem;
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+/* Input group */
+.input-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 1.4rem;
+}
+
+.input-group label {
+  font-size: 0.8rem;
+  color: #374151;
+  /* color: #111827; */
+  /* color: white; */
+  margin-bottom: 0.4rem;
+}
+
+.input-group input {
+  color: black;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.9rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  outline: none;
+  transition: border 0.2s ease;
+}
+
+.input-group input:focus {
+  border-color: #2563eb;
+}
+
+/* Button */
+.login-button {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.7rem;
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.login-button:hover {
+  background: #1e40af;
+}
+
+/* Footer */
+.login-footer {
+  margin-top: 1.8rem;
+  text-align: center;
+  font-size: 0.75rem;
+  color: #9ca3af;
+}
