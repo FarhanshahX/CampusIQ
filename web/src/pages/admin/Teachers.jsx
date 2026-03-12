@@ -17,12 +17,11 @@ const Teachers = () => {
   }, []);
 
   const columns = [
-    { key: "name", label: "Name" },
-    { key: "email", label: "Email" },
-    { key: "department", label: "Department" },
-    { key: "designation", label: "Designation" },
     { key: "employeeId", label: "Employee ID" },
-    { key: "status", label: "Status" },
+    { key: "firstName", label: "First Name" },
+    { key: "lastName", label: "Last Name" },
+    { key: "email", label: "Email" },
+    { key: "designation", label: "Designation" },
   ];
 
   return (

@@ -29,3 +29,20 @@ export const getStudents = async (req, res) => {
   const students = await Student.find();
   res.json(students);
 };
+
+export const getStudentbyID = async (req, res) => {
+  const { studentId } = req.params;
+  try {
+    const student = await Student.findById(studentId).populate(
+      "department",
+      "departmentName semester",
+    );
+    if (!student) {
+      return res.status(404).json({ message: "Student not found" });
+    }
+    res.json(student);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: "Error fetching student" });
+  }
+};

@@ -1,4 +1,15 @@
 const Table = ({ columns, data }) => {
+  // helper to resolve nested keys like "department.departmentName"
+  const getValue = (obj, key) => {
+    if (!obj || !key) return "";
+    return (
+      key.split(".").reduce((acc, part) => {
+        if (acc === null || acc === undefined) return "";
+        return acc[part];
+      }, obj) || ""
+    );
+  };
+
   return (
     <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
       <table className="min-w-full text-sm">
@@ -33,7 +44,7 @@ const Table = ({ columns, data }) => {
               >
                 {columns.map((col) => (
                   <td key={col.key} className="px-6 py-4 text-gray-700">
-                    {row[col.key]}
+                    {getValue(row, col.key)}
                   </td>
                 ))}
               </tr>

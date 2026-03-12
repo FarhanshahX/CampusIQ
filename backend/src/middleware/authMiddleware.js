@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
-const User = require("../models/User");
+const Teacher = require("../models/Teacher");
+const Admin = require("../models/Admin");
 
 exports.protect = async (req, res, next) => {
   let token;
@@ -12,14 +13,22 @@ exports.protect = async (req, res, next) => {
       token = req.headers.authorization.split(" ")[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      req.user = await User.findById(decoded.id).select("-password");
+      // Try to find user in Teacher model first, then Admin model
+      let user = await Teacher.findById(decoded.id).select("-password");
+      if (!user) {
+        user = await Admin.findById(decoded.id).select("-password");
+      }
+
+      if (!user) {
+        return res.status(401).json({ message: "User not found" });
+      }
+
+      req.user = user;
       next();
     } catch (error) {
       return res.status(401).json({ message: "Not authorized" });
     }
-  }
-
-  if (!token) {
+  } else {
     return res.status(401).json({ message: "No token provided" });
   }
 };

@@ -13,11 +13,15 @@ const Login = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await login(email, role, password);
+      const isFirstTime = await login(email, role, password);
       if (role === "ADMIN") {
-        navigate("/admin");
+        if (isFirstTime) {
+          navigate("/create-department");
+        } else {
+          navigate("/admin");
+        }
       } else if (role === "TEACHER") {
-        navigate("/teacher-dashboard");
+        navigate("/teacher");
       } else {
         navigate("/login");
       }

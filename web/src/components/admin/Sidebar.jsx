@@ -4,9 +4,9 @@ const Sidebar = () => {
   const navItems = [
     { name: "Dashboard", path: "/admin" },
     { name: "Teachers", path: "/admin/teachers" },
+    { name: "Subjects", path: "/admin/subjects" },
     { name: "Students", path: "/admin/students" },
-    { name: "Academics", path: "/admin/academics" },
-    { name: "Analytics", path: "/admin/analytics" },
+    { name: "Department", path: "/admin/department" },
     { name: "Settings", path: "/admin/settings" },
   ];
 

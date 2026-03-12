@@ -9,10 +9,17 @@ export const AuthProvider = ({ children }) => {
   );
 
   const login = async (email, role, password) => {
-    const { data } = await api.post("/auth/login", { email, role, password });
-    localStorage.setItem("token", data.token);
-    localStorage.setItem("user", JSON.stringify(data));
+    const { data } = await api.post("/auth/login", {
+      email,
+      role,
+      password,
+    });
     setUser(data);
+    localStorage.setItem("token", data.token);
+    localStorage.setItem("userID", data._id);
+    localStorage.setItem("firstTime", data.firstTime);
+
+    return data.firstTime;
   };
 
   const logout = () => {

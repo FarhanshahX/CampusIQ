@@ -3,22 +3,24 @@ const bcrypt = require("bcryptjs");
 
 const teacherSchema = new mongoose.Schema(
   {
-    name: { type: String, required: true },
-    email: { type: String, required: true, unique: true },
-    department: { type: String, required: true },
-    designation: { type: String, required: true },
-    dateOfBirth: { type: Date, required: true },
+    firstName: { type: String, required: true },
+    lastName: { type: String, required: true },
     employeeId: { type: String, required: true, unique: true },
+    email: { type: String, required: true, unique: true },
+    designation: { type: String, required: true },
+    department: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Department",
+    },
     password: { type: String, required: true },
     role: { type: String, default: "TEACHER" },
-    status: { type: String, default: "ACTIVE" },
   },
   { timestamps: true },
 );
 
 /* Hash password before save */
 teacherSchema.pre("save", async function () {
-  if (!this.isModified("password")) return;
+  if (!this.isModified("password")) return next();
   this.password = await bcrypt.hash(this.password, 10);
 });
 

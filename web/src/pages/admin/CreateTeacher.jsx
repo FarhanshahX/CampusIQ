@@ -1,14 +1,28 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import api from "../../api/axios";
 
 const CreateTeacher = () => {
+  const [department, setDepartment] = useState(null);
+
+  const adminId = localStorage.getItem("userID");
+
+  useEffect(() => {
+    fetchDepartment();
+  }, []);
+
+  const fetchDepartment = async () => {
+    const res = await api.get(`/admin/department/${adminId}`);
+    setDepartment(res.data);
+    setForm((prev) => ({ ...prev, department: res.data._id }));
+  };
+
   const [form, setForm] = useState({
-    name: "",
-    email: "",
-    department: "",
-    designation: "",
-    dateOfBirth: "",
+    fisrtName: "",
+    lastName: "",
     employeeId: "",
+    email: "",
+    designation: "",
+    department: "",
   });
 
   const formStyle = {
@@ -20,6 +34,14 @@ const CreateTeacher = () => {
     height: "100vh",
     width: "100%",
   };
+
+  const designations = [
+    "Head of Department",
+    "Professor",
+    "Associate Professor",
+    "Assistant Professor",
+    "Lecturer",
+  ];
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -33,12 +55,12 @@ const CreateTeacher = () => {
         `Teacher created successfully.\nTemporary Password: ${res.data.tempPassword}`,
       );
       setForm({
-        name: "",
-        email: "",
-        department: "",
-        designation: "",
-        dateOfBirth: "",
+        fisrtName: "",
+        lastName: "",
         employeeId: "",
+        email: "",
+        designation: "",
+        department: department._id,
       });
       fetchTeachers();
     } catch (err) {
@@ -63,24 +85,33 @@ const CreateTeacher = () => {
           className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-5"
           style={{ color: "#000000" }}
         >
-          <Input name="name" label="Full Name" onChange={handleChange} />
-          <Input name="email" label="Email" onChange={handleChange} />
-          <Input name="department" label="Department" onChange={handleChange} />
-          <Input
-            name="designation"
-            label="Designation"
-            onChange={handleChange}
-          />
+          <Input name="firstName" label="First Name" onChange={handleChange} />
+          <Input name="lastName" label="Last Name" onChange={handleChange} />
           <Input
             name="employeeId"
             label="Employee ID"
             onChange={handleChange}
           />
-          <Input
-            name="dateOfBirth"
-            label="Date of Birth"
-            type="date"
+          <Input name="email" label="Official Email" onChange={handleChange} />
+          <select
+            name="designation"
+            label="Designation"
+            className="w-full px-3 py-1 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
             onChange={handleChange}
+          >
+            <option value="">Select Designation</option>
+            {designations.map((role) => (
+              <option key={role} value={role}>
+                {role}
+              </option>
+            ))}
+          </select>
+
+          <Input
+            name="department"
+            value={department?.departmentName || "Loading..."}
+            label="Department"
+            readOnly
           />
 
           <div className="md:col-span-2">
