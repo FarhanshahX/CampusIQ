@@ -19,6 +19,8 @@ exports.createResource = async (req, res) => {
       subjectId,
       teacherId,
       fileUrl: `/uploads/resources/${file.filename}`,
+      fileName: file.originalname,
+      fileSize: file.size,
       fileType: file.mimetype,
     });
 

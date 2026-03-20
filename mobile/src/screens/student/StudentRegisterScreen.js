@@ -50,8 +50,6 @@ const StudentRegisterScreen = ({ navigation }) => {
 
   const pickImage = async (setImage) => {
     try {
-      console.log("Upload pressed");
-
       const permission =
         await ImagePicker.requestMediaLibraryPermissionsAsync();
 
@@ -358,23 +356,34 @@ const DateInput = ({ label, value, onChange }) => {
   );
 };
 
-const DepartmentDropdown = ({ value, onChange, departments }) => (
-  <View style={{ marginBottom: 12 }}>
-    <Text style={labelStyle}>Department</Text>
-    <View style={pickerWrapper}>
-      <Picker selectedValue={value} onValueChange={onChange}>
-        <Picker.Item label="Select Department" value="" />
-        {departments.map((dept) => (
-          <Picker.Item
-            key={dept._id}
-            label={dept.departmentName}
-            value={dept._id}
-          />
-        ))}
-      </Picker>
+const DepartmentDropdown = ({ value, onChange, departments }) => {
+  const getDeptShortName = (dept) => {
+    if (!dept) return "";
+    return dept
+      .split(" ")
+      .map((word) => word[0])
+      .join("")
+      .toUpperCase();
+  };
+
+  return (
+    <View style={{ marginBottom: 12 }}>
+      <Text style={labelStyle}>Department & Semester</Text>
+      <View style={pickerWrapper}>
+        <Picker selectedValue={value} onValueChange={onChange}>
+          <Picker.Item label="Select Department & Semester" value="" />
+          {departments.map((dept) => (
+            <Picker.Item
+              key={dept._id}
+              label={`${getDeptShortName(dept.departmentName)} || Semester: ${dept.semester}`}
+              value={dept._id}
+            />
+          ))}
+        </Picker>
+      </View>
     </View>
-  </View>
-);
+  );
+};
 
 const SectionDropdown = ({ value, onChange }) => (
   <View style={{ marginBottom: 12 }}>

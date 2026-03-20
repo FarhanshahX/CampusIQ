@@ -254,7 +254,9 @@ const completeRegistration = async (req, res) => {
 // fetch list of departments for dropdowns
 const getDepartments = async (req, res) => {
   try {
-    const departments = await Department.find().select("departmentName");
+    const departments = await Department.find().select(
+      "departmentName semester",
+    );
     res.json(departments);
   } catch (err) {
     console.error("getDepartments error:", err);
@@ -262,4 +264,60 @@ const getDepartments = async (req, res) => {
   }
 };
 
-module.exports = { initiateRegistration, completeRegistration, getDepartments };
+const updateStudentProfile = async (req, res) => {
+  try {
+    const student = await Student.findById(req.body.userId);
+
+    if (student) {
+      student.firstName = req.body.firstName || student.firstName;
+      student.lastName = req.body.lastName || student.lastName;
+      student.mobile = req.body.mobile || student.mobile;
+
+      // Update CGPA if provided
+      if (req.body.cgpa) {
+        student.cgpa = req.body.cgpa;
+      }
+
+      if (req.body.photoUrl) {
+        if (req.body.photoUrl.startsWith("data:image")) {
+          const result = await cloudinary.uploader.upload(req.body.photoUrl, {
+            folder: "students/photos",
+          });
+          student.studentPhoto = result.secure_url;
+        } else {
+          student.studentPhoto = req.body.photoUrl;
+        }
+      }
+
+      if (req.body.password) {
+        student.password = req.body.password; // pre-save hook handles hashing
+      }
+
+      const updatedStudent = await student.save();
+
+      res.json({
+        _id: updatedStudent._id,
+        firstName: updatedStudent.firstName,
+        lastName: updatedStudent.lastName,
+        email: updatedStudent.email,
+        mobile: updatedStudent.mobile,
+        registrationNumber: updatedStudent.registrationNumber,
+        departmentID: updatedStudent.department,
+        cgpa: updatedStudent.cgpa,
+        studentPhoto: updatedStudent.studentPhoto,
+        role: "STUDENT",
+      });
+    } else {
+      res.status(404).json({ message: "Student not found" });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+module.exports = {
+  initiateRegistration,
+  completeRegistration,
+  getDepartments,
+  updateStudentProfile,
+};

@@ -14,13 +14,14 @@ const teacherSchema = new mongoose.Schema(
     },
     password: { type: String, required: true },
     role: { type: String, default: "TEACHER" },
+    photoUrl: { type: String },
   },
   { timestamps: true },
 );
 
 /* Hash password before save */
 teacherSchema.pre("save", async function () {
-  if (!this.isModified("password")) return next();
+  if (!this.isModified("password")) return;
   this.password = await bcrypt.hash(this.password, 10);
 });
 

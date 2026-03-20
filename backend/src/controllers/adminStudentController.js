@@ -1,6 +1,6 @@
-import Student from "../models/Student.js";
+const Student = require("../models/Student.js");
 
-export const createStudent = async (req, res) => {
+const createStudent = async (req, res) => {
   const { name, email, rollNumber, department, year, semester, dateOfBirth } =
     req.body;
 
@@ -25,12 +25,15 @@ export const createStudent = async (req, res) => {
   res.status(201).json(student);
 };
 
-export const getStudents = async (req, res) => {
-  const students = await Student.find();
+const getStudents = async (req, res) => {
+  const students = await Student.find().populate(
+    "department",
+    "departmentName semester",
+  );
   res.json(students);
 };
 
-export const getStudentbyID = async (req, res) => {
+const getStudentbyID = async (req, res) => {
   const { studentId } = req.params;
   try {
     const student = await Student.findById(studentId).populate(
@@ -45,4 +48,10 @@ export const getStudentbyID = async (req, res) => {
     console.error(error);
     res.status(500).json({ message: "Error fetching student" });
   }
+};
+
+module.exports = {
+  createStudent,
+  getStudents,
+  getStudentbyID,
 };

@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FAFAFA",
     marginBottom: 12,
   },
-  picker: { height: 48, color: "#111827" },
+  picker: { height: 50, color: "#111827" },
 
   // Count row
   countRow: {

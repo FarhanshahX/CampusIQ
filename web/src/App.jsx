@@ -8,7 +8,6 @@ import CreateDepartment from "./pages/admin/CreateDepartment";
 import AdminDashboard from "./pages/admin/Dashboard";
 import Department from "./pages/admin/Department";
 import Subjects from "./pages/admin/Subjects";
-import Analytics from "./pages/admin/Analytics";
 import Settings from "./pages/admin/Settings";
 import Teachers from "./pages/admin/Teachers";
 import Students from "./pages/admin/Students";
@@ -17,6 +16,16 @@ import CreateStudent from "./pages/admin/CreateStudent";
 import CreateSubject from "./pages/admin/CreateSubject";
 import TeacherLayout from "./layouts/TeacherLayout";
 import TeacherDashboard from "./pages/teacher/Dashboard";
+import AdminAttendance from "./pages/admin/Attendance";
+import AdminAnnouncements from "./pages/admin/Announcements";
+import AdminProfile from "./pages/admin/Profile";
+import AdminAnalytics from "./pages/admin/Analytics";
+import TeacherAnalytics from "./pages/teacher/Analytics";
+import TeacherProfile from "./pages/teacher/Profile";
+import TeacherAttendance from "./pages/teacher/Attendance";
+import TeacherScoresEntering from "./pages/teacher/ScoresEntering";
+import TeacherResources from "./pages/teacher/Resources";
+import TeacherAnnouncements from "./pages/teacher/Announcements";
 
 function App() {
   return (
@@ -36,6 +45,10 @@ function App() {
           }
         >
           <Route index element={<AdminDashboard />} />
+          <Route path="analytics" element={<AdminAnalytics />} />
+          <Route path="attendance" element={<AdminAttendance />} />
+          <Route path="announcements" element={<AdminAnnouncements />} />
+          <Route path="profile" element={<AdminProfile />} />
           <Route path="teachers" element={<Teachers />} />
           <Route path="subjects" element={<Subjects />} />
           <Route path="students" element={<Students />} />
@@ -75,10 +88,12 @@ function App() {
           }
         >
           <Route index element={<TeacherDashboard />} />
-          {/* <Route path="myclasses" element={<MyClasses />} /> */}
-          <Route path="students" element={<Students />} />
-          <Route path="analytics" element={<Analytics />} />
-          <Route path="settings" element={<Settings />} />
+          <Route path="analytics" element={<TeacherAnalytics />} />
+          <Route path="attendance" element={<TeacherAttendance />} />
+          <Route path="scoresentering" element={<TeacherScoresEntering />} />
+          <Route path="resources" element={<TeacherResources />} />
+          <Route path="announcements" element={<TeacherAnnouncements />} />
+          <Route path="profile" element={<TeacherProfile />} />
         </Route>
       </Routes>
     </BrowserRouter>

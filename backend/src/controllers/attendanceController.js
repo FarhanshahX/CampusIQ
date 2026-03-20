@@ -1,166 +1,8 @@
-// const AttendanceSession = require("../models/AttendanceSession.js");
-// const AttendanceRecord = require("../models/AttendanceRecord.js");
-// const crypto = require("crypto");
-
-// const startAttendanceSession = async (req, res) => {
-//   try {
-//     const {
-//       subject,
-//       department,
-//       semester,
-//       section,
-//       sessionType,
-//       lectureStart,
-//       lectureEnd,
-//       duration,
-//       topic,
-//       user,
-//     } = req.body;
-
-//     const teacherId = user._id;
-
-//     const bluetoothToken = crypto.randomBytes(16).toString("hex");
-
-//     const parseTime = (timeStr) => {
-//       const [hours, minutes] = timeStr.split(":");
-//       const date = new Date();
-//       date.setHours(parseInt(hours), parseInt(minutes), 0, 0);
-//       return date;
-//     };
-
-//     const session = await AttendanceSession.create({
-//       subject,
-//       teacher: teacherId,
-//       department,
-//       semester,
-//       section,
-//       sessionType,
-//       lectureStart: parseTime(lectureStart), // Now a Date object
-//       lectureEnd: parseTime(lectureEnd), // Now a Date object
-//       duration,
-//       topic,
-//       bluetoothToken,
-//     });
-
-//     res.json({
-//       message: "Attendance session started",
-//       session,
-//     });
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };
-
-// const markAttendance = async (req, res) => {
-//   try {
-//     const { bluetoothToken, studentId } = req.body;
-
-//     // const studentId = req.user.id;
-
-//     const session = await AttendanceSession.findOne({
-//       bluetoothToken,
-//       status: "active",
-//     });
-
-//     if (!session) {
-//       return res.status(400).json({ message: "Attendance session not active" });
-//     }
-
-//     const alreadyMarked = await AttendanceRecord.findOne({
-//       session: session._id,
-//       student: studentId,
-//     });
-
-//     if (alreadyMarked) {
-//       return res.status(400).json({ message: "Attendance already marked" });
-//     }
-
-//     const record = await AttendanceRecord.create({
-//       session: session._id,
-//       student: studentId,
-//     });
-
-//     res.json({
-//       message: "Attendance marked successfully",
-//       record,
-//     });
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };
-
-// const closeAttendanceSession = async (req, res) => {
-//   try {
-//     const { sessionId } = req.params;
-
-//     await AttendanceSession.findByIdAndUpdate(sessionId, {
-//       status: "closed",
-//     });
-
-//     res.json({
-//       message: "Attendance session closed",
-//     });
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };
-
-// const getAttendanceStats = async (req, res) => {
-//   try {
-//     const { subjectId } = req.params;
-
-//     const stats = await AttendanceRecord.aggregate([
-//       {
-//         $lookup: {
-//           from: "attendancesessions",
-//           localField: "session",
-//           foreignField: "_id",
-//           as: "sessionData",
-//         },
-//       },
-//       { $unwind: "$sessionData" },
-//       {
-//         $match: {
-//           "sessionData.subject": new mongoose.Types.ObjectId(subjectId),
-//         },
-//       },
-//       {
-//         $group: {
-//           _id: "$student",
-//           total: { $sum: 1 },
-//         },
-//       },
-//     ]);
-
-//     res.json(stats);
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };
-
-// const getActiveSessions = async (req, res) => {
-//   try {
-//     const activeSessions = await AttendanceSession.find({ status: "active" })
-//       .populate("teacher", "firstName")
-//       .populate("subject", "subjectName");
-//     res.json(activeSessions);
-//   } catch (error) {
-//     res.status(500).json({ message: error.message });
-//   }
-// };
-
-// module.exports = {
-//   startAttendanceSession,
-//   markAttendance,
-//   getAttendanceStats,
-//   closeAttendanceSession,
-//   getActiveSessions,
-// };
-
 const mongoose = require("mongoose");
 const crypto = require("crypto");
 const AttendanceSession = require("../models/AttendanceSession.js");
 const AttendanceRecord = require("../models/AttendanceRecord.js");
+const Student = require("../models/Student.js");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // HELPER — build a today-midnight Date from a "HH:MM" string
@@ -179,6 +21,25 @@ const todayMidnight = () => {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
   return d;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HELPER — lazy-close a session if its duration has passed
+// ─────────────────────────────────────────────────────────────────────────────
+const checkAndCloseIfExpired = async (session) => {
+  if (!session || session.status === "closed") return null;
+
+  const now = new Date();
+  const expiryTime = new Date(
+    session.createdAt.getTime() + session.duration * 60000,
+  );
+
+  if (now > expiryTime) {
+    session.status = "closed";
+    await session.save();
+    return null;
+  }
+  return session;
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -202,8 +63,6 @@ const startAttendanceSession = async (req, res) => {
       totalStudents, // number of enrolled students — used for absent calculation
       user,
     } = req.body;
-
-    console.log(req.body);
 
     // teacherId must come from the verified JWT, never from the body
     const teacherId = user;
@@ -258,17 +117,9 @@ const startAttendanceSession = async (req, res) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// POST /attendance/mark
-// Body: { sessionId, bluetoothToken, deviceId }
-// Auth: req.user._id  ← studentId comes from JWT, never from body
-// ─────────────────────────────────────────────────────────────────────────────
 const markAttendance = async (req, res) => {
   try {
-    const { sessionId, bluetoothToken, deviceId } = req.body;
-
-    // studentId from JWT — cannot be spoofed
-    const studentId = req.user._id;
+    const { sessionId, studentId, bluetoothToken, deviceId, user } = req.body;
 
     // 1. Validate required fields
     if (!sessionId || !bluetoothToken || !deviceId) {
@@ -278,13 +129,16 @@ const markAttendance = async (req, res) => {
     }
 
     // 2. Find session by ID first, then verify token — avoids a full-collection token scan
-    const session = await AttendanceSession.findById(sessionId);
+    let session = await AttendanceSession.findById(sessionId);
 
     if (!session) {
       return res.status(404).json({ message: "Session not found." });
     }
 
-    if (session.status !== "active") {
+    // Lazy-close if expired
+    session = await checkAndCloseIfExpired(session);
+
+    if (!session || session.status !== "active") {
       return res
         .status(400)
         .json({ message: "This attendance session has already closed." });
@@ -301,10 +155,9 @@ const markAttendance = async (req, res) => {
 
     // 4. For Practical sessions — verify the student belongs to this section
     if (session.sessionType === "Practical") {
-      // req.user.section should be set when the student logs in
-      if (req.user.section && req.user.section !== session.section) {
+      if (user.section && user.section !== session.section) {
         return res.status(403).json({
-          message: `This session is for Section ${session.section}. You are in Section ${req.user.section}.`,
+          message: `This session is for Section ${session.section}. You are in Section ${user.section}.`,
         });
       }
     }
@@ -342,14 +195,10 @@ const markAttendance = async (req, res) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PUT /attendance/close/:sessionId
-// Auth: teacher only — verify the session belongs to req.user
-// ─────────────────────────────────────────────────────────────────────────────
 const closeAttendanceSession = async (req, res) => {
   try {
     const { sessionId } = req.params;
-    const teacherId = req.user._id;
+    const teacherId = req.body.userId;
 
     const session = await AttendanceSession.findById(sessionId);
 
@@ -377,42 +226,25 @@ const closeAttendanceSession = async (req, res) => {
   }
 };
 
-// ─────────────────────────────────────────────────────────────────────────────
-// GET /attendance/active
-// Returns active sessions relevant to the requesting user.
-//   • Teacher → their own active session(s)
-//   • Student → active sessions matching their dept + semester (+ section for Practical)
-// Auth: protect middleware sets req.user and req.user.role
-// ─────────────────────────────────────────────────────────────────────────────
-const getActiveSessions = async (req, res) => {
+const getActiveTeacherSession = async (req, res) => {
   try {
-    let query = { status: "active" };
-
-    if (req.user.role === "teacher") {
-      // Teacher only needs to see their own session
-      query.teacher = req.user._id;
-    } else {
-      // Student — filter by their department and semester
-      query.department = req.user.department;
-      query.semester = req.user.semester;
-
-      // For Practical sessions, also filter by section so Batch A doesn't
-      // see Batch B's session. We want: Lectures (any) OR Practicals for their section.
-      // MongoDB $or handles this cleanly.
-      query = {
-        ...query,
-        $or: [
-          { sessionType: { $in: ["Lecture", "Extra Class"] } },
-          { sessionType: "Practical", section: req.user.section },
-        ],
-      };
+    const teacherId = req.query.teacherId;
+    if (!teacherId) {
+      return res.status(400).json({ message: "teacherId is required." });
     }
 
-    const sessions = await AttendanceSession.find(query)
-      .populate("teacher", "firstName lastName")
-      .populate("subject", "subjectName");
+    const session = await AttendanceSession.findOne({
+      teacher: teacherId,
+      status: "active",
+    }).populate("subject", "subjectName");
 
-    res.json(sessions);
+    if (!session) {
+      return res.json(null);
+    }
+
+    // Lazy-close if expired
+    const activeSession = await checkAndCloseIfExpired(session);
+    res.json(activeSession);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -425,11 +257,28 @@ const getActiveSessions = async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 const getAttendanceHistory = async (req, res) => {
   try {
-    const { subjectId, month, studentId } = req.query;
+    const { subjectId, month, studentId, type } = req.query;
 
     if (!subjectId) {
       return res.status(400).json({ message: "subjectId is required." });
     }
+
+    // ── Step 0: Find all students enrolled in this subject's criteria ───────
+    // We need this to get a full student list for the filter AND for accurate absent counts.
+    const Subject = require("../models/Subject.js");
+    const subject = await Subject.findById(subjectId);
+    if (!subject)
+      return res.status(404).json({ message: "Subject not found." });
+
+    const studentCriteria = {
+      department: subject.department,
+      // semester: subject.semester, // Optional: if students switch semesters
+    };
+    // Note: section filtering is handled per-session for Practicals,
+    // but the teacher might want to see all students in the department/semester.
+    const allStudentsEnrolled = await Student.find(studentCriteria)
+      .select("firstName lastName rollNumber section")
+      .sort({ rollNumber: 1 });
 
     // ── Step 1: find all closed sessions for this subject ──────────────────
     const sessionQuery = {
@@ -437,13 +286,16 @@ const getAttendanceHistory = async (req, res) => {
       status: "closed",
     };
 
-    if (month) {
-      // Filter sessions whose `date` falls in the given month of the current year
+    if (month && month !== "overall") {
       const year = new Date().getFullYear();
       sessionQuery.date = {
         $gte: new Date(year, parseInt(month, 10) - 1, 1),
         $lt: new Date(year, parseInt(month, 10), 1),
       };
+    }
+
+    if (type && type !== "all") {
+      sessionQuery.sessionType = type;
     }
 
     const sessions = await AttendanceSession.find(sessionQuery)
@@ -454,7 +306,11 @@ const getAttendanceHistory = async (req, res) => {
       return res.json({
         history: [],
         summary: { totalClasses: 0, attended: 0, absent: 0, rate: 0 },
-        students: [],
+        students: allStudentsEnrolled.map((s) => ({
+          _id: s._id,
+          name: `${s.firstName} ${s.lastName}`,
+          roll: s.rollNumber,
+        })),
       });
     }
 
@@ -462,7 +318,9 @@ const getAttendanceHistory = async (req, res) => {
 
     // ── Step 2: fetch all records for those sessions ───────────────────────
     const recordQuery = { session: { $in: sessionIds } };
-    if (studentId) recordQuery.student = new mongoose.Types.ObjectId(studentId);
+    if (studentId && studentId !== "all") {
+      recordQuery.student = new mongoose.Types.ObjectId(studentId);
+    }
 
     const records = await AttendanceRecord.find(recordQuery).populate(
       "student",
@@ -475,13 +333,12 @@ const getAttendanceHistory = async (req, res) => {
       presentMap[s._id.toString()] = new Set();
     });
     records.forEach((r) => {
-      presentMap[r.session.toString()]?.add(r.student._id.toString());
+      if (r.student) {
+        presentMap[r.session.toString()]?.add(r.student._id.toString());
+      }
     });
 
     // ── Step 3: build history rows ─────────────────────────────────────────
-    // For teacher view: one row per (session × student that was enrolled)
-    // Since we don't have an enrollment collection here, we show present students
-    // + compute absent from session.totalStudents.
     const history = records.map((r) => {
       const sess = sessions.find(
         (s) => s._id.toString() === r.session.toString(),
@@ -504,7 +361,9 @@ const getAttendanceHistory = async (req, res) => {
         subjectName: sess.subject?.subjectName || "",
         sessionType: sess.sessionType,
         topic: sess.topic || "",
-        studentName: `${r.student?.firstName} ${r.student?.lastName}`,
+        studentName: r.student
+          ? `${r.student.firstName} ${r.student.lastName}`
+          : "Unknown Student",
         studentRoll: r.student?.rollNumber || "",
         status: "PRESENT",
       };
@@ -512,30 +371,36 @@ const getAttendanceHistory = async (req, res) => {
 
     // ── Step 4: summary ───────────────────────────────────────────────────
     const totalClasses = sessions.length;
-    const totalPresent = records.length;
-    // totalAbsent = sum over all sessions of (totalStudents - present in that session)
-    const totalAbsent = sessions.reduce((acc, sess) => {
-      const presentCount = presentMap[sess._id.toString()].size;
-      return acc + Math.max(0, (sess.totalStudents || 0) - presentCount);
-    }, 0);
-    const rate =
-      totalClasses > 0
-        ? Math.round((totalPresent / (totalPresent + totalAbsent)) * 100)
-        : 0;
+    let totalPresent = records.length;
+    let totalAbsent = 0;
+    let rate = 0;
 
-    // ── Step 5: unique student list for the filter dropdown ────────────────
-    const studentMap = {};
-    records.forEach((r) => {
-      const id = r.student._id.toString();
-      if (!studentMap[id]) {
-        studentMap[id] = {
-          _id: id,
-          name: `${r.student.firstName} ${r.student.lastName}`,
-          roll: r.student.rollNumber,
-        };
-      }
-    });
-    const students = Object.values(studentMap);
+    if (studentId && studentId !== "all") {
+      // Single student summary
+      totalPresent = records.length;
+      totalAbsent = totalClasses - totalPresent;
+      rate =
+        totalClasses > 0 ? Math.round((totalPresent / totalClasses) * 100) : 0;
+    } else {
+      // Overall class summary
+      totalAbsent = sessions.reduce((acc, sess) => {
+        const presentInSess = presentMap[sess._id.toString()].size;
+        // If sess.totalStudents is 0, fall back to current enrollment count
+        const expected = sess.totalStudents || allStudentsEnrolled.length;
+        return acc + Math.max(0, expected - presentInSess);
+      }, 0);
+      rate =
+        totalPresent + totalAbsent > 0
+          ? Math.round((totalPresent / (totalPresent + totalAbsent)) * 100)
+          : 0;
+    }
+
+    // ── Step 5: student list for the filter dropdown (all enrolled) ─────────
+    const studentsForFilter = allStudentsEnrolled.map((s) => ({
+      _id: s._id,
+      name: `${s.firstName} ${s.lastName}`,
+      roll: s.rollNumber,
+    }));
 
     res.json({
       history,
@@ -545,7 +410,7 @@ const getAttendanceHistory = async (req, res) => {
         absent: totalAbsent,
         rate,
       },
-      students,
+      students: studentsForFilter,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -559,8 +424,8 @@ const getAttendanceHistory = async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 const getStudentAttendanceHistory = async (req, res) => {
   try {
-    const { subjectId, month } = req.query;
-    const studentId = req.user._id;
+    const { subjectId, month, userId, section } = req.query;
+    const studentId = userId;
 
     if (!subjectId) {
       return res.status(400).json({ message: "subjectId is required." });
@@ -581,13 +446,12 @@ const getStudentAttendanceHistory = async (req, res) => {
     }
 
     // For Practical — only sessions for the student's own section
-    if (req.user.section) {
+    if (section) {
       sessionQuery.$or = [
         { sessionType: { $in: ["Lecture", "Extra Class"] } },
-        { sessionType: "Practical", section: req.user.section },
+        { sessionType: "Practical", section: section },
       ];
     }
-
     const sessions = await AttendanceSession.find(sessionQuery)
       .populate("subject", "subjectName")
       .sort({ date: -1 });
@@ -643,11 +507,87 @@ const getStudentAttendanceHistory = async (req, res) => {
   }
 };
 
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /attendance/student-overall
+// Returns aggregate overall attendance percentage for the STUDENT.
+// Auth: studentId from req.user._id
+// ─────────────────────────────────────────────────────────────────────────────
+const getStudentOverallAttendance = async (req, res) => {
+  try {
+    const studentId = req.params.studentId;
+    const section = req.params.section;
+
+    // First fetch all of the student's records
+    const attendedRecords = await AttendanceRecord.find({
+      student: studentId,
+    });
+
+    // We only care about records for sessions that are closed
+    const attendedSessionIds = attendedRecords.map((r) => r.session);
+
+    // Get all those sessions
+    const attendedSessions = await AttendanceSession.find({
+      _id: { $in: attendedSessionIds },
+      status: "closed",
+    });
+
+    const totalAttended = attendedSessions.length;
+
+    // Now figure out how many total classes there have been for the student's program overall
+    // We assume the student's program is defined by their department and section.
+    // To be perfectly accurate across all subjects, we just fetch all closed sessions
+    // that apply to this student's section/lectures
+    const sessionQuery = {
+      status: "closed",
+    };
+
+    if (section) {
+      sessionQuery.$or = [
+        { sessionType: { $in: ["Lecture", "Extra Class"] } },
+        { sessionType: "Practical", section: section },
+      ];
+    }
+
+    const allSessions = await AttendanceSession.find(sessionQuery);
+    const totalClasses = allSessions.length;
+    const rate = totalClasses > 0 ? (totalAttended / totalClasses) * 100 : 0;
+
+    res.json({
+      rate: parseFloat(rate.toFixed(1)), // Keep it to 1 decimal place
+      totalClasses,
+      attended: totalAttended,
+    });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const getActiveSessions = async (req, res) => {
+  try {
+    const sessions = await AttendanceSession.find({
+      status: "active",
+    });
+
+    // Lazy-close all expired sessions found
+    const filteredSessions = [];
+    for (const sess of sessions) {
+      const active = await checkAndCloseIfExpired(sess);
+      if (active) filteredSessions.push(active);
+    }
+
+    res.json(filteredSessions);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   startAttendanceSession,
   markAttendance,
   closeAttendanceSession,
   getActiveSessions,
+  getActiveTeacherSession, // Exported
   getAttendanceHistory,
   getStudentAttendanceHistory,
+  getStudentOverallAttendance,
 };

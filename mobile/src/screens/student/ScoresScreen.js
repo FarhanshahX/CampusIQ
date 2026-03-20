@@ -165,19 +165,18 @@ export default function ScoresScreen() {
       resetFields();
       setFetching(true);
       try {
+        // Fetch lock status for the subject FIRST
+        const lockRes = await api.get(
+          `/scores/lock/status/${encodeURIComponent(subject)}`,
+        );
+        const { isLocked: locked } = lockRes.data || {};
+        setIsLocked(!!locked);
+
         // Fetch marks for the student
         const res = await api.get(
           `/scores/${user._id}/${encodeURIComponent(subject)}`,
         );
         const { marks } = res.data || {};
-
-        // Fetch lock status for the subject
-        const lockRes = await api.get(
-          `/scores/lock/status/${encodeURIComponent(subject)}`,
-        );
-        const { isLocked: locked } = lockRes.data || {};
-
-        setIsLocked(!!locked);
 
         if (!marks) return;
 
@@ -225,7 +224,7 @@ export default function ScoresScreen() {
         setFetching(false);
       }
     },
-    [user._id],
+    [user._id, selectedSubject],
   );
 
   const saveScores = async () => {
@@ -310,6 +309,10 @@ export default function ScoresScreen() {
     </View>
   );
 
+  const currentSubjectType = subjects.find(
+    (sub) => sub._id === selectedSubject,
+  )?.subjectType;
+
   // ─────────────────────────────────────────────────────────────────────────
 
   return (
@@ -371,28 +374,42 @@ export default function ScoresScreen() {
       {/* Dim everything while fetching */}
       <View style={fetching ? styles.sectionsDimmed : null}>
         {/* ── Internal Tests ── */}
-        <View style={styles.card}>
-          <SectionHeader
-            title="Internal Tests"
-            subtitle="Each test out of 10"
-          />
-          {renderGrid(internal, setInternal, "Test")}
-          <ResultPill label="Converted Score" value={internalTotal} max="20" />
-        </View>
+        {currentSubjectType !== "Lab+Practical" && (
+          <View style={styles.card}>
+            <SectionHeader
+              title="Internal Tests"
+              subtitle="Each test out of 10"
+            />
+            {renderGrid(internal, setInternal, "Test")}
+            <ResultPill
+              label="Converted Score"
+              value={internalTotal}
+              max="20"
+            />
+          </View>
+        )}
 
         {/* ── Experiments ── */}
-        <View style={styles.card}>
-          <SectionHeader title="Experiments" subtitle="Each out of 15" />
-          {renderGrid(experiments, setExperiments, "Exp")}
-          <ResultPill label="Average Score" value={experimentTotal} max="15" />
-        </View>
+        {currentSubjectType !== "Theory" && (
+          <View style={styles.card}>
+            <SectionHeader title="Experiments" subtitle="Each out of 15" />
+            {renderGrid(experiments, setExperiments, "Exp")}
+            <ResultPill
+              label="Average Score"
+              value={experimentTotal}
+              max="15"
+            />
+          </View>
+        )}
 
         {/* ── Assignments ── */}
-        <View style={styles.card}>
-          <SectionHeader title="Assignments" subtitle="Each out of 5" />
-          {renderGrid(assignments, setAssignments, "Assignment")}
-          <ResultPill label="Average Score" value={assignmentTotal} max="5" />
-        </View>
+        {currentSubjectType !== "Theory" && (
+          <View style={styles.card}>
+            <SectionHeader title="Assignments" subtitle="Each out of 5" />
+            {renderGrid(assignments, setAssignments, "Assignment")}
+            <ResultPill label="Average Score" value={assignmentTotal} max="5" />
+          </View>
+        )}
 
         {/* ── Teacher-Entered Fields (read-only for students) ── */}
         <View style={styles.card}>
@@ -412,30 +429,51 @@ export default function ScoresScreen() {
             note="Based on your attendance record"
           />
           <View style={styles.rowDivider} />
-          <ReadOnlyRow
-            label="Practical / Oral"
-            value={practical}
-            max="25"
-            note="Entered after practical examination"
-          />
+          {currentSubjectType === "Theory+Lab+Practical" && (
+            <ReadOnlyRow
+              label="Practical / Oral"
+              value={practical}
+              max="25"
+              note="Entered after practical examination"
+            />
+          )}
           <View style={styles.rowDivider} />
-          <ReadOnlyRow
-            label="Theory Exam"
-            value={theory}
-            max="80"
-            note="Entered after semester exam"
-          />
+          {currentSubjectType !== "Lab+Practical" && (
+            <ReadOnlyRow
+              label="Theory Exam"
+              value={theory}
+              max="80"
+              note="Entered after semester exam"
+            />
+          )}
         </View>
 
         {/* ── Grand Total ── */}
         <View style={styles.totalCard}>
           <View style={styles.totalLeft}>
             <Text style={styles.totalLabel}>TOTAL MARKS</Text>
-            <Text style={styles.totalNote}>Internal + Practical + Theory</Text>
+            <Text style={styles.totalNote}>
+              {currentSubjectType === "Theory+Lab+Practical"
+                ? "Internal + Lab + Practical + Theory"
+                : currentSubjectType === "Theory+Lab"
+                  ? "Internal + Lab + Theory"
+                  : currentSubjectType === "Theory"
+                    ? "Internal + Theory"
+                    : "Lab + Practical"}
+            </Text>
           </View>
           <View style={styles.totalRight}>
             <Text style={styles.totalValue}>{grandTotal}</Text>
-            <Text style={styles.totalMax}>/ 150</Text>
+            <Text style={styles.totalMax}>
+              /{" "}
+              {currentSubjectType === "Theory+Lab+Practical"
+                ? "150"
+                : currentSubjectType === "Theory+Lab"
+                  ? "125"
+                  : currentSubjectType === "Theory"
+                    ? "100"
+                    : "50"}
+            </Text>
           </View>
         </View>
       </View>
@@ -537,7 +575,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     backgroundColor: "#FAFAFA",
   },
-  picker: { height: 48, color: "#111827" },
+  picker: { height: 50, color: "#111827" },
 
   // Status banners
   banner: {

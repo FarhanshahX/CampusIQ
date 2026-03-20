@@ -68,57 +68,64 @@ const SectionDivider = ({ title }) => (
   </View>
 );
 
-const ResourceCard = ({ item, onDelete }) => (
-  <View style={styles.resourceCard}>
-    <View style={styles.resourceIconWrap}>
-      <Text style={styles.resourceIcon}>{getFileIcon(item.fileName)}</Text>
-    </View>
-    <View style={styles.resourceInfo}>
-      <Text style={styles.resourceTitle} numberOfLines={1}>
-        {item.title}
-      </Text>
-      {item.description ? (
-        <Text style={styles.resourceDesc} numberOfLines={1}>
-          {item.description}
+// Resolve the best display name: stored fileName → last segment of fileUrl → ""
+const resolveFileName = (item) =>
+  item.fileName || (item.fileUrl ? item.fileUrl.split("/").pop() : "") || "";
+
+const ResourceCard = ({ item, onDelete }) => {
+  const displayName = resolveFileName(item);
+  return (
+    <View style={styles.resourceCard}>
+      <View style={styles.resourceIconWrap}>
+        <Text style={styles.resourceIcon}>{getFileIcon(displayName)}</Text>
+      </View>
+      <View style={styles.resourceInfo}>
+        <Text style={styles.resourceTitle} numberOfLines={1}>
+          {item.title}
         </Text>
-      ) : null}
-      <View style={styles.resourceMeta}>
-        <View style={styles.extBadge}>
-          <Text style={styles.extBadgeText}>{getFileExt(item.fileName)}</Text>
-        </View>
-        {item.fileSize ? (
-          <Text style={styles.metaText}>{formatSize(item.fileSize)}</Text>
+        {item.description ? (
+          <Text style={styles.resourceDesc} numberOfLines={1}>
+            {item.description}
+          </Text>
         ) : null}
-        <Text style={styles.metaText}>{formatDate(item.createdAt)}</Text>
+        <View style={styles.resourceMeta}>
+          <View style={styles.extBadge}>
+            <Text style={styles.extBadgeText}>{getFileExt(displayName)}</Text>
+          </View>
+          {item.fileSize ? (
+            <Text style={styles.metaText}>{formatSize(item.fileSize)}</Text>
+          ) : null}
+          <Text style={styles.metaText}>{formatDate(item.createdAt)}</Text>
+        </View>
+      </View>
+      <View style={styles.resourceActions}>
+        <TouchableOpacity
+          style={styles.actionBtn}
+          onPress={() => {
+            if (item.fileUrl) {
+              const fullUrl = `${API_BASE_URL}${item.fileUrl}`;
+              Linking.openURL(fullUrl).catch((err) => {
+                console.error("Failed to open file:", err);
+              });
+            }
+          }}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.actionBtnText}>↗</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.actionBtn, styles.actionBtnDelete]}
+          onPress={() => onDelete(item._id)}
+          activeOpacity={0.7}
+        >
+          <Text style={[styles.actionBtnText, styles.actionBtnDeleteText]}>
+            ✕
+          </Text>
+        </TouchableOpacity>
       </View>
     </View>
-    <View style={styles.resourceActions}>
-      <TouchableOpacity
-        style={styles.actionBtn}
-        onPress={() => {
-          if (item.fileUrl) {
-            const fullUrl = `${API_BASE_URL}${item.fileUrl}`;
-            Linking.openURL(fullUrl).catch((err) => {
-              console.error("Failed to open file:", err);
-            });
-          }
-        }}
-        activeOpacity={0.7}
-      >
-        <Text style={styles.actionBtnText}>↗</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        style={[styles.actionBtn, styles.actionBtnDelete]}
-        onPress={() => onDelete(item._id)}
-        activeOpacity={0.7}
-      >
-        <Text style={[styles.actionBtnText, styles.actionBtnDeleteText]}>
-          ✕
-        </Text>
-      </TouchableOpacity>
-    </View>
-  </View>
-);
+  );
+};
 
 const EmptyState = () => (
   <View style={styles.emptyState}>
@@ -135,24 +142,10 @@ const UploadSheet = ({ visible, onClose, onSuccess }) => {
   const [description, setDescription] = useState("");
   const [file, setFile] = useState(null);
   const [uploading, setUploading] = useState(false);
-  const [subjectId, setSubjectId] = useState(null);
 
-  const teacherId = useAuth().user._id;
-
-  useEffect(() => {
-    // Fetch the teacher's subjects to associate the resource with one
-    const fetchSubjects = async (teacherId) => {
-      try {
-        const res = await api.get(`/subjects/teacher/${teacherId}`);
-        if (res.data && res.data.length > 0) {
-          setSubjectId(res.data[0]._id); // Default to first subject
-        }
-      } catch (err) {
-        console.log("Error fetching subjects: ", err);
-      }
-    };
-    fetchSubjects(teacherId);
-  }, [teacherId]);
+  const { user, activeSubject } = useAuth();
+  const teacherId = user._id;
+  const subjectId = activeSubject?._id;
 
   const reset = () => {
     setTitle("");
@@ -192,7 +185,10 @@ const UploadSheet = ({ visible, onClose, onSuccess }) => {
     }
     if (!subjectId) {
       // Add this check
-      Alert.alert("No subject", "Could not load your subjects. Try again.");
+      Alert.alert(
+        "No subject",
+        "Could not load the active subject. Try selecting one from your Profile.",
+      );
       return;
     }
     const formData = new FormData();
@@ -319,7 +315,10 @@ const UploadSheet = ({ visible, onClose, onSuccess }) => {
 
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
+import TeacherHeader from "../../components/TeacherHeader";
+
 export default function TeacherResourceScreen() {
+  const { activeSubject } = useAuth();
   const [resources, setResources] = useState([]);
   const [loadingResources, setLoadingResources] = useState(true);
   const [showUpload, setShowUpload] = useState(false);
@@ -327,18 +326,22 @@ export default function TeacherResourceScreen() {
   const fetchResources = useCallback(async () => {
     setLoadingResources(true);
     try {
-      const res = await api.get("/resources");
-      setResources(res.data || []);
+      if (activeSubject && activeSubject._id) {
+        const res = await api.get(`/resources/subject/${activeSubject._id}`);
+        setResources(res.data || []);
+      } else {
+        setResources([]);
+      }
     } catch (err) {
       console.log(err);
     } finally {
       setLoadingResources(false);
     }
-  }, []);
+  }, [activeSubject]);
 
   useEffect(() => {
     fetchResources();
-  }, []);
+  }, [fetchResources, activeSubject]);
 
   const handleDelete = (id) => {
     Alert.alert(
@@ -369,57 +372,65 @@ export default function TeacherResourceScreen() {
   };
 
   return (
-    <View style={styles.screen}>
-      {/* ── Header ── */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTag}>TEACHER PORTAL</Text>
-          <Text style={styles.headerTitle}>Resources</Text>
-          <Text style={styles.headerSubtitle}>
-            {resources.length} file{resources.length !== 1 ? "s" : ""} shared
-            with students
-          </Text>
-        </View>
-        <TouchableOpacity
-          style={styles.addBtn}
-          onPress={() => setShowUpload(true)}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.addBtnText}>+ Upload</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* ── Resource List ── */}
-      <ScrollView
-        style={styles.list}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-      >
-        <SectionDivider title="UPLOADED FILES" />
-
-        {loadingResources ? (
-          <View style={styles.loadingWrap}>
-            <ActivityIndicator color="#3B5BDB" />
-            <Text style={styles.loadingText}>Loading resources…</Text>
+    <>
+      <TeacherHeader />
+      <View style={styles.screen}>
+        {/* ── Header ── */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.headerTag}>TEACHER PORTAL</Text>
+            <Text style={styles.headerTitle}>Resources</Text>
+            <Text style={styles.headerSubtitle}>
+              {resources.length} file{resources.length !== 1 ? "s" : ""} shared
+              with{"\n"}
+              {activeSubject ? activeSubject.subjectName : "students"}
+            </Text>
           </View>
-        ) : resources.length === 0 ? (
-          <EmptyState />
-        ) : (
-          resources.map((item) => (
-            <ResourceCard key={item._id} item={item} onDelete={handleDelete} />
-          ))
-        )}
+          <TouchableOpacity
+            style={styles.addBtn}
+            onPress={() => setShowUpload(true)}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.addBtnText}>+ Upload</Text>
+          </TouchableOpacity>
+        </View>
 
-        <View style={{ height: 40 }} />
-      </ScrollView>
+        {/* ── Resource List ── */}
+        <ScrollView
+          style={styles.list}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <SectionDivider title="UPLOADED FILES" />
 
-      {/* ── Upload Modal ── */}
-      <UploadSheet
-        visible={showUpload}
-        onClose={() => setShowUpload(false)}
-        onSuccess={handleUploadSuccess}
-      />
-    </View>
+          {loadingResources ? (
+            <View style={styles.loadingWrap}>
+              <ActivityIndicator color="#3B5BDB" />
+              <Text style={styles.loadingText}>Loading resources…</Text>
+            </View>
+          ) : resources.length === 0 ? (
+            <EmptyState />
+          ) : (
+            resources.map((item) => (
+              <ResourceCard
+                key={item._id}
+                item={item}
+                onDelete={handleDelete}
+              />
+            ))
+          )}
+
+          <View style={{ height: 40 }} />
+        </ScrollView>
+
+        {/* ── Upload Modal ── */}
+        <UploadSheet
+          visible={showUpload}
+          onClose={() => setShowUpload(false)}
+          onSuccess={handleUploadSuccess}
+        />
+      </View>
+    </>
   );
 }
 
@@ -434,7 +445,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "flex-end",
     paddingHorizontal: 20,
-    paddingTop: 56,
+    paddingTop: 5,
     paddingBottom: 20,
     backgroundColor: "#FFFFFF",
     borderBottomWidth: 1,
@@ -459,6 +470,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   headerSubtitle: {
+    maxWidth: "70%",
     fontSize: 12,
     color: "#9CA3AF",
     marginTop: 2,

@@ -151,8 +151,8 @@ const CreateSubject = () => {
                   Theory + Lab + Practical
                 </option>
                 <option value="Theory+Lab">Theory + Lab</option>
-                <option value="Theory">Theory</option>
-                <option value="Lab+Practical">Lab + Practical</option>
+                <option value="Theory">Elective</option>
+                <option value="Lab+Practical">Skill Based Lab Course</option>
               </select>
             </div>
 

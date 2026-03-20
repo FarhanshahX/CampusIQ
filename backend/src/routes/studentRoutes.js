@@ -4,6 +4,7 @@ const {
   initiateRegistration,
   completeRegistration,
   getDepartments,
+  updateStudentProfile,
 } = require("../controllers/studentController");
 const { uploadStudents } = require("../controllers/studentUploadController.js");
 
@@ -24,5 +25,7 @@ router.post(
 router.post("/initiate-registration", initiateRegistration);
 
 router.post("/upload/:departmentId", upload.single("file"), uploadStudents);
+
+router.put("/profile", updateStudentProfile);
 
 module.exports = router;

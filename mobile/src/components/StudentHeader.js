@@ -72,7 +72,7 @@ const StudentHeader = () => {
       </View>
 
       {/* RIGHT SIDE */}
-      <TouchableOpacity onPress={() => navigation.navigate("Messages")}>
+      <TouchableOpacity onPress={() => navigation.navigate("Announcements")}>
         <Ionicons name="notifications-outline" size={26} color="#000" />
       </TouchableOpacity>
     </View>
@@ -81,7 +81,7 @@ const StudentHeader = () => {
 
 const styles = StyleSheet.create({
   container: {
-    paddingTop: 15,
+    paddingTop: 25,
     paddingHorizontal: 15,
     paddingBottom: 15,
     backgroundColor: "#fff",

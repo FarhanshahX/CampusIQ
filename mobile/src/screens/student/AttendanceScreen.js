@@ -1,361 +1,3 @@
-// import React, { useState, useEffect } from "react";
-// import {
-//   View,
-//   Text,
-//   StyleSheet,
-//   TouchableOpacity,
-//   FlatList,
-//   Alert,
-// } from "react-native";
-// import api from "../../api/axios";
-// import { useAuth } from "../../context/AuthContext";
-
-// export default function StudentAttendanceScreen() {
-//   const [isInRange, setIsInRange] = useState(false);
-//   const [bluetoothToken, setBluetoothToken] = useState(null);
-//   const [activeSession, setActiveSession] = useState(null);
-//   const [history, setHistory] = useState([]);
-//   const [summary, setSummary] = useState({
-//     total: 0,
-//     attended: 0,
-//     rate: 0,
-//   });
-//   const { user } = useAuth();
-
-//   // Detect active attendance session
-//   useEffect(() => {
-//     checkAttendanceSession();
-//     fetchAttendanceHistory();
-//   }, []);
-
-//   // Simulated Bluetooth Range Check
-//   const checkAttendanceSession = async () => {
-//     try {
-//       const res = await api.get("/attendance/active");
-
-//       if (res.data) {
-//         setActiveSession(res.data[0]);
-//         // setBluetoothToken(res.data[0].bluetoothToken);
-
-//         // simulate bluetooth range
-//         setIsInRange(true);
-//       }
-//     } catch (err) {
-//       console.log(err);
-//     }
-//   };
-
-//   // Mark Attendance
-//   const markAttendance = async () => {
-//     if (!activeSession) return;
-
-//     try {
-//       await api.post("/attendance/mark", {
-//         sessionId: activeSession._id,
-//         studentId: user._id,
-//         bluetoothToken: activeSession.bluetoothToken,
-//       });
-
-//       Alert.alert("Success", "Attendance Marked");
-
-//       fetchAttendanceHistory();
-//     } catch (err) {
-//       Alert.alert("Error", "Unable to mark attendance");
-//     }
-//   };
-
-//   // Fetch History
-//   const fetchAttendanceHistory = async () => {
-//     try {
-//       const res = await api.get("/attendance/student-history");
-
-//       setHistory(res.data.history);
-//       setSummary(res.data.summary);
-//     } catch (err) {
-//       console.log(err);
-//     }
-//   };
-
-//   const renderHistory = ({ item }) => (
-//     <View style={styles.historyCard}>
-//       <View style={styles.dateBox}>
-//         <Text style={styles.month}>{item.month}</Text>
-//         <Text style={styles.date}>{item.date}</Text>
-//       </View>
-
-//       <View style={{ flex: 1 }}>
-//         <Text style={styles.subject}>{item.subject}</Text>
-//         <Text style={styles.time}>
-//           {item.day} • {item.time}
-//         </Text>
-//       </View>
-
-//       <View
-//         style={[
-//           styles.status,
-//           item.status === "PRESENT" ? styles.present : styles.absent,
-//         ]}
-//       >
-//         <Text
-//           style={{
-//             color: item.status === "PRESENT" ? "green" : "red",
-//           }}
-//         >
-//           {item.status}
-//         </Text>
-//       </View>
-//     </View>
-//   );
-
-//   return (
-//     <View style={styles.container}>
-//       {/* Attendance Card */}
-
-//       {activeSession && (
-//         <View style={styles.card}>
-//           <View style={styles.sessionHeader}>
-//             <Text style={styles.live}>ATTENDANCE IN PROGRESS</Text>
-
-//             <Text>
-//               {activeSession.lectureStart} - {activeSession.lectureEnd}
-//             </Text>
-//           </View>
-
-//           <Text style={styles.title}>{activeSession.subject.subjectName}</Text>
-
-//           <Text style={styles.teacher}>
-//             Prof. {activeSession.teacher.firstName}
-//           </Text>
-
-//           {isInRange ? (
-//             <TouchableOpacity style={styles.markBtn} onPress={markAttendance}>
-//               <Text style={styles.btnText}>Mark Present</Text>
-//             </TouchableOpacity>
-//           ) : (
-//             <Text style={styles.rangeText}>
-//               Move closer to classroom to mark attendance
-//             </Text>
-//           )}
-//         </View>
-//       )}
-
-//       {/* Attendance History */}
-
-//       <Text style={styles.sectionTitle}>Attendance History</Text>
-
-//       <FlatList
-//         data={history}
-//         renderItem={renderHistory}
-//         keyExtractor={(item) => item.id}
-//       />
-
-//       {/* Monthly Summary */}
-
-//       <View style={styles.summaryCard}>
-//         <Text style={styles.sectionTitle}>Monthly Summary</Text>
-
-//         <View style={styles.summaryRow}>
-//           <View>
-//             <Text style={styles.summaryLabel}>TOTAL</Text>
-//             <Text style={styles.summaryValue}>{summary.total}</Text>
-//           </View>
-
-//           <View>
-//             <Text style={styles.summaryLabel}>ATTENDED</Text>
-//             <Text style={styles.summaryValue}>{summary.attended}</Text>
-//           </View>
-
-//           <View>
-//             <Text style={styles.summaryLabel}>RATE</Text>
-//             <Text style={styles.summaryRate}>{summary.rate}%</Text>
-//           </View>
-//         </View>
-
-//         <View style={styles.progressBar}>
-//           <View style={[styles.progress, { width: `${summary.rate}%` }]} />
-//         </View>
-//       </View>
-//     </View>
-//   );
-// }
-
-// const styles = StyleSheet.create({
-//   container: {
-//     flex: 1,
-//     padding: 16,
-//     backgroundColor: "#F5F6FA",
-//   },
-
-//   card: {
-//     backgroundColor: "white",
-//     padding: 20,
-//     borderRadius: 12,
-//     marginBottom: 20,
-//     elevation: 3,
-//   },
-
-//   sessionHeader: {
-//     flexDirection: "row",
-//     justifyContent: "space-between",
-//     marginBottom: 10,
-//   },
-
-//   live: {
-//     color: "#2563EB",
-//     fontWeight: "bold",
-//   },
-
-//   title: {
-//     fontSize: 20,
-//     fontWeight: "bold",
-//     marginBottom: 6,
-//   },
-
-//   teacher: {
-//     color: "#555",
-//     marginBottom: 15,
-//   },
-
-//   markBtn: {
-//     backgroundColor: "#2563EB",
-//     padding: 14,
-//     borderRadius: 10,
-//     alignItems: "center",
-//   },
-
-//   btnText: {
-//     color: "white",
-//     fontWeight: "bold",
-//     fontSize: 16,
-//   },
-
-//   rangeText: {
-//     color: "red",
-//     textAlign: "center",
-//   },
-
-//   sectionTitle: {
-//     fontSize: 18,
-//     fontWeight: "bold",
-//     marginVertical: 10,
-//   },
-
-//   historyCard: {
-//     flexDirection: "row",
-//     alignItems: "center",
-//     backgroundColor: "white",
-//     padding: 14,
-//     borderRadius: 10,
-//     marginBottom: 10,
-//   },
-
-//   dateBox: {
-//     backgroundColor: "#EEF2FF",
-//     padding: 10,
-//     borderRadius: 8,
-//     alignItems: "center",
-//     marginRight: 10,
-//   },
-
-//   month: {
-//     fontSize: 12,
-//   },
-
-//   date: {
-//     fontSize: 18,
-//     fontWeight: "bold",
-//   },
-
-//   subject: {
-//     fontWeight: "bold",
-//   },
-
-//   time: {
-//     color: "#666",
-//   },
-
-//   status: {
-//     paddingHorizontal: 10,
-//     paddingVertical: 4,
-//     borderRadius: 10,
-//   },
-
-//   present: {
-//     backgroundColor: "#DCFCE7",
-//   },
-
-//   absent: {
-//     backgroundColor: "#FEE2E2",
-//   },
-
-//   summaryCard: {
-//     backgroundColor: "white",
-//     padding: 20,
-//     borderRadius: 12,
-//     marginTop: 20,
-//   },
-
-//   summaryRow: {
-//     flexDirection: "row",
-//     justifyContent: "space-between",
-//     marginVertical: 10,
-//   },
-
-//   summaryLabel: {
-//     color: "#888",
-//   },
-
-//   summaryValue: {
-//     fontSize: 20,
-//     fontWeight: "bold",
-//   },
-
-//   summaryRate: {
-//     fontSize: 20,
-//     fontWeight: "bold",
-//     color: "#2563EB",
-//   },
-
-//   progressBar: {
-//     height: 8,
-//     backgroundColor: "#E5E7EB",
-//     borderRadius: 10,
-//     marginTop: 10,
-//   },
-
-//   progress: {
-//     height: 8,
-//     backgroundColor: "#2563EB",
-//     borderRadius: 10,
-//   },
-// });
-
-/**
- * StudentAttendanceScreen.jsx
- *
- * Sections:
- *   1. Mark Attendance Card  — shown only when a session is active
- *        • In-range  → enabled "Mark Present" button
- *        • Out-of-range → card shown but disabled with a proximity hint
- *        • No session → section hidden entirely
- *        • Practical sessions → student only sees card for their own batch/section
- *
- *   2. Attendance History    — filterable table (Subject × Month)
- *
- *   3. Attendance Summary    — per-subject stats, synced with Subject filter
- *
- * API endpoints consumed:
- *   GET  /attendance/active                          → active session(s) for student's dept/sem
- *   POST /attendance/mark                            → { sessionId, studentId, bluetoothToken, deviceId }
- *   GET  /attendance/student-history?subjectId=&month= → { history[], summary{} }
- *   GET  /subjects/student/:studentId               → [{ _id, subjectName, ... }]
- *
- * Bluetooth / device note:
- *   Replace the simulated `checkBluetooth()` with your actual BLE scanning logic
- *   (e.g. react-native-ble-plx). The token comparison happens there.
- *   deviceId should be a hashed device fingerprint (e.g. from react-native-device-info).
- */
-
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
@@ -371,9 +13,10 @@ import {
 import { Picker } from "@react-native-picker/picker";
 import { useAuth } from "../../context/AuthContext";
 import api from "../../api/axios";
+import { startContinuousScan } from "../../utils/BLEManager";
 
 // ─────────────────────────────────────────────
-// PALETTE  (consistent with TeacherAttendanceScreen)
+// PALETTE
 // ─────────────────────────────────────────────
 const C = {
   bg: "#F0F4FF",
@@ -427,7 +70,6 @@ const formatTime = (dateStr) => {
 // ─────────────────────────────────────────────
 // SUB-COMPONENTS
 // ─────────────────────────────────────────────
-
 const Divider = () => <View style={s.divider} />;
 
 const SectionHeading = ({ title, sub }) => (
@@ -477,19 +119,23 @@ const StatTile = ({ label, value, accent }) => (
 // ─────────────────────────────────────────────
 // MARK ATTENDANCE CARD
 // ─────────────────────────────────────────────
-const MarkAttendanceCard = ({ session, isInRange, onMark, marking }) => {
+const MarkAttendanceCard = ({
+  session,
+  isInRange,
+  scanning,
+  onMark,
+  marking,
+}) => {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    // Fade in on mount
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 400,
       useNativeDriver: true,
     }).start();
 
-    // Pulse the live dot
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
@@ -515,10 +161,10 @@ const MarkAttendanceCard = ({ session, isInRange, onMark, marking }) => {
       style={[
         s.markCard,
         { opacity: fadeAnim },
-        !isInRange && s.markCardDisabled,
+        !isInRange && !scanning && s.markCardDisabled,
       ]}
     >
-      {/* Header row */}
+      {/* Header */}
       <View style={s.markCardHeader}>
         <View style={s.liveChip}>
           <Animated.View
@@ -563,31 +209,41 @@ const MarkAttendanceCard = ({ session, isInRange, onMark, marking }) => {
 
       <Divider />
 
-      {/* CTA */}
-      {isInRange ? (
-        <TouchableOpacity
-          style={[s.markBtn, marking && s.markBtnLoading]}
-          onPress={onMark}
-          disabled={marking}
-          activeOpacity={0.85}
-        >
-          {marking ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={s.markBtnText}>✓ Mark Present</Text>
-          )}
-        </TouchableOpacity>
-      ) : (
-        <View style={s.outOfRangeBox}>
-          <Text style={s.outOfRangeIcon}>📡</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={s.outOfRangeTitle}>Out of Bluetooth Range</Text>
-            <Text style={s.outOfRangeSub}>
-              Move closer to the classroom to mark your attendance.
-            </Text>
-          </View>
+      {/* BLE scanning status */}
+      {scanning && (
+        <View style={s.scanningBox}>
+          <ActivityIndicator size="small" color={C.accent} />
+          <Text style={s.scanningText}>Scanning for teacher's device…</Text>
         </View>
       )}
+
+      {/* CTA */}
+      {!scanning &&
+        (isInRange ? (
+          <TouchableOpacity
+            style={[s.markBtn, marking && s.markBtnLoading]}
+            onPress={onMark}
+            disabled={marking}
+            activeOpacity={0.85}
+          >
+            {marking ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={s.markBtnText}>✓ Mark Present</Text>
+            )}
+          </TouchableOpacity>
+        ) : (
+          <View style={s.outOfRangeBox}>
+            <Text style={s.outOfRangeIcon}>📡</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={s.outOfRangeTitle}>Out of Bluetooth Range</Text>
+              <Text style={s.outOfRangeSub}>
+                Move closer to the classroom. The app will re-check every 15
+                seconds.
+              </Text>
+            </View>
+          </View>
+        ))}
     </Animated.View>
   );
 };
@@ -601,12 +257,17 @@ export default function StudentAttendanceScreen() {
   // ── Active session ────────────────────────
   const [activeSession, setActiveSession] = useState(null);
   const [isInRange, setIsInRange] = useState(false);
+  const [scanning, setScanning] = useState(false); // true during first BLE scan
   const [marking, setMarking] = useState(false);
   const [alreadyMarked, setAlreadyMarked] = useState(false);
 
+  // Ref to hold the BLE scan cleanup function so we can cancel it on unmount
+  // or when the session disappears.
+  const stopScanRef = useRef(null);
+
   // ── Subjects & filters ────────────────────
   const [subjects, setSubjects] = useState([]);
-  const [filterSubject, setFilterSubject] = useState(null); // full subject object
+  const [filterSubject, setFilterSubject] = useState(null);
   const [filterMonth, setFilterMonth] = useState("overall");
 
   // ── History ───────────────────────────────
@@ -631,17 +292,68 @@ export default function StudentAttendanceScreen() {
     }
   }, [user]);
 
-  // Re-fetch history when filters change
   useEffect(() => {
     if (filterSubject) fetchHistory();
   }, [filterSubject, filterMonth]);
 
+  // Re-check active session whenever history changes (to update alreadyMarked status)
+  useEffect(() => {
+    if (history.length > 0) {
+      checkActiveSession();
+    }
+  }, [history]);
+
+  // Stop BLE scanning on unmount
+  useEffect(() => {
+    return () => {
+      if (stopScanRef.current) stopScanRef.current();
+    };
+  }, []);
+
+  // ─────────────────────────────────────────
+  // BLE SCANNING
+  // ─────────────────────────────────────────
+  /**
+   * Called once we know which session is active.
+   * Kicks off a continuous BLE scan that updates `isInRange` every ~15 s.
+   */
+  const startBLEScan = (bluetoothToken) => {
+    // Cancel any previous scan
+    if (stopScanRef.current) stopScanRef.current();
+
+    setScanning(true);
+    setIsInRange(false);
+
+    // startContinuousScan fires the first scan immediately, then repeats.
+    // We wrap setIsInRange so we can also clear the `scanning` spinner after
+    // the very first result comes back.
+    let firstResult = true;
+    const wrappedSetter = (inRange) => {
+      if (firstResult) {
+        firstResult = false;
+        setScanning(false);
+      }
+      setIsInRange(inRange);
+    };
+
+    const cleanup = startContinuousScan(
+      bluetoothToken,
+      wrappedSetter,
+      15000, // re-scan every 15 s
+      8000, // each scan times out after 8 s
+    );
+
+    stopScanRef.current = cleanup;
+  };
+
   // ─────────────────────────────────────────
   // API CALLS
   // ─────────────────────────────────────────
+
+  const departmentId = useAuth().user.departmentID;
   const fetchSubjects = async () => {
     try {
-      const res = await api.get(`/subjects/student/${user._id}`);
+      const res = await api.get(`/subjects/${departmentId}`);
       setSubjects(res.data);
       if (res.data.length > 0) setFilterSubject(res.data[0]);
     } catch (e) {
@@ -650,11 +362,8 @@ export default function StudentAttendanceScreen() {
   };
 
   /**
-   * Checks for an active session matching this student's dept/sem.
-   * For Practical sessions, the backend should already filter by the
-   * student's section so only the relevant batch gets the session.
-   *
-   * Also runs a simulated Bluetooth check — replace with real BLE scan.
+   * Fetches active sessions from the server and starts BLE scanning
+   * for the relevant session's token.
    */
   const checkActiveSession = async () => {
     try {
@@ -663,27 +372,46 @@ export default function StudentAttendanceScreen() {
 
       if (!sessions || sessions.length === 0) {
         setActiveSession(null);
+        setIsInRange(false);
+        if (stopScanRef.current) {
+          stopScanRef.current();
+          stopScanRef.current = null;
+        }
         return;
       }
 
-      // For Practical: filter by student's section
-      // The backend ideally does this, but guard on frontend too.
+      // Filter by student's section for Practical sessions
       const relevant = sessions.find((sess) => {
         if (sess.sessionType === "Practical") {
-          return sess.section === user.section; // user.section = "A" | "B" | "C" | "D"
+          return sess.section === user.section;
         }
-        return true; // Lecture/Extra Class → all students
+        return true;
       });
 
       setActiveSession(relevant || null);
 
       if (relevant) {
-        // ── REPLACE THIS with actual BLE scan ──────────────────────────
-        // e.g. scan for the teacher's device broadcasting `relevant.bluetoothToken`
-        // const found = await scanBluetooth(relevant.bluetoothToken);
-        // setIsInRange(found);
-        // ──────────────────────────────────────────────────────────────
-        setIsInRange(true); // simulated: always in range for now
+        // ── Check if already marked for this session ──────────────────────
+        // We can check if this session's ID is present in our current history list
+        // or just wait for the next history fetch. For better reliability,
+        // we check the history array directly.
+        const isMarked = history.some(
+          (h) => h._id === relevant._id && h.status === "PRESENT",
+        );
+        if (isMarked) {
+          setAlreadyMarked(true);
+        } else {
+          setAlreadyMarked(false);
+          // ── Start real BLE scan for the session token ───────────────────
+          startBLEScan(relevant.bluetoothToken);
+        }
+      } else {
+        setAlreadyMarked(false);
+        setIsInRange(false);
+        if (stopScanRef.current) {
+          stopScanRef.current();
+          stopScanRef.current = null;
+        }
       }
     } catch (e) {
       console.log("checkActiveSession:", e);
@@ -699,7 +427,15 @@ export default function StudentAttendanceScreen() {
         studentId: user._id,
         bluetoothToken: activeSession.bluetoothToken,
         deviceId: user.deviceId, // hashed device fingerprint from app init
+        user: user,
       });
+
+      // Stop BLE scan — no longer needed after marking
+      if (stopScanRef.current) {
+        stopScanRef.current();
+        stopScanRef.current = null;
+      }
+
       setAlreadyMarked(true);
       Alert.alert(
         "Attendance Marked ✓",
@@ -714,18 +450,14 @@ export default function StudentAttendanceScreen() {
     }
   };
 
-  /**
-   * GET /attendance/student-history?subjectId=&month=
-   * Returns:
-   *   history : [{ _id, date, dayLabel, time, subjectName, sessionType, status }]
-   *   summary : { totalClasses, attended, absent, rate }
-   */
   const fetchHistory = useCallback(async () => {
     if (!filterSubject) return;
     setHistoryLoading(true);
     try {
       const params = new URLSearchParams({ subjectId: filterSubject._id });
       if (filterMonth !== "overall") params.append("month", filterMonth);
+      params.append("userId", user._id);
+      params.append("section", user.section);
 
       const res = await api.get(`/attendance/student-history?${params}`);
       setHistory(res.data.history || []);
@@ -785,6 +517,7 @@ export default function StudentAttendanceScreen() {
         <MarkAttendanceCard
           session={activeSession}
           isInRange={isInRange}
+          scanning={scanning}
           onMark={handleMarkAttendance}
           marking={marking}
         />
@@ -802,40 +535,84 @@ export default function StudentAttendanceScreen() {
         </View>
       )}
 
+      {!activeSession && (
+        <View style={s.card}>
+          <Text style={s.emptyText}>
+            📭 No active session right now.{"\n"}Your teacher hasn't started one
+            yet.
+          </Text>
+        </View>
+      )}
+
       {/* ══════════════════════════════════════
           SECTION 2 — HISTORY
       ══════════════════════════════════════ */}
       <View style={s.card}>
         <SectionHeading
           title="Attendance History"
-          sub="Your session-by-session record"
+          sub={filterSubject?.subjectName || ""}
         />
+
+        {/* Summary */}
+        <View style={s.statsRow}>
+          <StatTile label="Classes" value={summary.totalClasses} />
+          <StatTile label="Present" value={summary.attended} accent />
+          <StatTile label="Absent" value={summary.absent} />
+        </View>
+        <View style={s.rateRow}>
+          <Text style={s.rateLabel}>Attendance Rate</Text>
+          <Text
+            style={[
+              s.rateValue,
+              {
+                color:
+                  summary.rate >= 75
+                    ? C.success
+                    : summary.rate >= 50
+                      ? C.warn
+                      : C.danger,
+              },
+            ]}
+          >
+            {summary.rate}%
+          </Text>
+        </View>
+        <ProgressBar value={summary.rate} />
+
+        {summary.rate < 75 && summary.totalClasses > 0 && (
+          <View style={s.warnBanner}>
+            <Text style={s.warnText}>
+              ⚠️ Your attendance is below 75%. You may be debarred from exams if
+              this continues.
+            </Text>
+          </View>
+        )}
+
+        <Divider />
 
         {/* Filters */}
         <View style={s.filterRow}>
-          <View style={s.filterItem}>
+          <View style={[s.filterItem, { marginRight: 8 }]}>
             <Text style={s.filterLabel}>Subject</Text>
             <View style={s.pickerWrap}>
               <Picker
-                selectedValue={filterSubject?._id}
-                onValueChange={(val) => {
-                  const subj = subjects.find((s) => s._id === val);
-                  if (subj) setFilterSubject(subj);
-                }}
+                selectedValue={filterSubject?._id || ""}
+                onValueChange={(val) =>
+                  setFilterSubject(subjects.find((s) => s._id === val) || null)
+                }
                 style={s.picker}
               >
-                {subjects.map((subj) => (
+                {subjects.map((sub) => (
                   <Picker.Item
-                    key={subj._id}
-                    label={subj.subjectName}
-                    value={subj._id}
+                    key={sub._id}
+                    label={sub.subjectName}
+                    value={sub._id}
                   />
                 ))}
               </Picker>
             </View>
           </View>
-
-          <View style={[s.filterItem, { marginLeft: 10 }]}>
+          <View style={s.filterItem}>
             <Text style={s.filterLabel}>Month</Text>
             <View style={s.pickerWrap}>
               <Picker
@@ -853,95 +630,30 @@ export default function StudentAttendanceScreen() {
 
         <Divider />
 
-        {/* Table header */}
-        <View style={s.tableHeader}>
-          <View style={s.dateBoxPlaceholder} />
-          <Text style={[s.tableHeadCell, { flex: 1 }]}>Subject & Details</Text>
-          <Text style={s.tableHeadCell}>Status</Text>
-        </View>
-
-        {/* Table body */}
+        {/* Table */}
         {historyLoading ? (
-          <ActivityIndicator color={C.accent} style={{ marginVertical: 24 }} />
+          <ActivityIndicator color={C.accent} style={{ marginVertical: 20 }} />
         ) : history.length === 0 ? (
-          <Text style={s.emptyText}>
-            No records found for the selected filters.
-          </Text>
+          <Text style={s.emptyText}>No records found.</Text>
         ) : (
-          <FlatList
-            data={history}
-            keyExtractor={(item) => item._id}
-            renderItem={renderHistoryRow}
-            scrollEnabled={false}
-          />
+          <>
+            <View style={s.tableHeader}>
+              <View style={s.dateBoxPlaceholder} />
+              <Text style={[s.tableHeadCell, { flex: 1 }]}>Subject</Text>
+              <Text
+                style={[s.tableHeadCell, { width: 70, textAlign: "right" }]}
+              >
+                Status
+              </Text>
+            </View>
+            <FlatList
+              data={history}
+              keyExtractor={(item) => item._id}
+              renderItem={renderHistoryRow}
+              scrollEnabled={false}
+            />
+          </>
         )}
-      </View>
-
-      {/* ══════════════════════════════════════
-          SECTION 3 — SUMMARY
-      ══════════════════════════════════════ */}
-      <View style={s.card}>
-        <SectionHeading
-          title="Attendance Summary"
-          sub={filterSubject?.subjectName ?? "Select a subject"}
-        />
-
-        {/* Stat tiles */}
-        <View style={s.statsRow}>
-          <StatTile label="Total" value={summary.totalClasses} />
-          <StatTile label="Attended" value={summary.attended} accent />
-          <StatTile label="Absent" value={summary.absent} />
-          <StatTile
-            label="Rate"
-            value={`${summary.rate ?? pct(summary.attended, summary.totalClasses)}%`}
-            accent
-          />
-        </View>
-
-        <Divider />
-
-        {/* Rate bar */}
-        <View style={s.rateRow}>
-          <Text style={s.rateLabel}>Overall Rate</Text>
-          <Text
-            style={[
-              s.rateValue,
-              { color: (summary.rate ?? 0) >= 75 ? C.success : C.danger },
-            ]}
-          >
-            {summary.rate ?? pct(summary.attended, summary.totalClasses)}%
-          </Text>
-        </View>
-        <ProgressBar
-          value={summary.rate ?? pct(summary.attended, summary.totalClasses)}
-        />
-
-        {/* Warning if below threshold */}
-        {(summary.rate ?? pct(summary.attended, summary.totalClasses)) < 75 && (
-          <View style={s.warnBanner}>
-            <Text style={s.warnText}>
-              ⚠ Your attendance is below 75%. You may be barred from exams if
-              this continues.
-            </Text>
-          </View>
-        )}
-
-        {/* How many more classes needed */}
-        {(() => {
-          const rate =
-            summary.rate ?? pct(summary.attended, summary.totalClasses);
-          if (rate >= 75 || summary.totalClasses === 0) return null;
-          // Solve: (attended + x) / (total + x) >= 0.75
-          const x = Math.ceil(
-            (0.75 * summary.totalClasses - summary.attended) / (1 - 0.75),
-          );
-          return (
-            <Text style={s.recoverText}>
-              Attend the next {x} consecutive class{x > 1 ? "es" : ""} to reach
-              75%.
-            </Text>
-          );
-        })()}
       </View>
     </ScrollView>
   );
@@ -956,9 +668,10 @@ const s = StyleSheet.create({
     backgroundColor: C.bg,
     paddingHorizontal: 16,
   },
-
-  // ── Page Header ──────────────────────────
   pageHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingTop: 24,
     paddingBottom: 16,
   },
@@ -973,6 +686,27 @@ const s = StyleSheet.create({
     color: C.muted,
     marginTop: 2,
   },
+  liveChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFE8E8",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 20,
+    gap: 6,
+  },
+  liveDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: C.live,
+  },
+  liveText: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: C.live,
+    letterSpacing: 1,
+  },
 
   // ── Mark Attendance Card ─────────────────
   markCard: {
@@ -980,45 +714,22 @@ const s = StyleSheet.create({
     borderRadius: 16,
     padding: 20,
     marginBottom: 16,
-    borderLeftWidth: 4,
-    borderLeftColor: C.live,
-    shadowColor: C.live,
-    shadowOpacity: 0.12,
-    shadowRadius: 16,
+    shadowColor: C.primary,
+    shadowOpacity: 0.1,
+    shadowRadius: 14,
     shadowOffset: { width: 0, height: 6 },
-    elevation: 5,
+    elevation: 4,
+    borderWidth: 1.5,
+    borderColor: "#D0E4F7",
   },
   markCardDisabled: {
-    borderLeftColor: C.disabled,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
+    opacity: 0.8,
   },
   markCardHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 10,
-  },
-  liveChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "#FFE8E8",
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 20,
-    gap: 5,
-  },
-  liveDot: {
-    width: 7,
-    height: 7,
-    borderRadius: 3.5,
-    backgroundColor: C.live,
-  },
-  liveText: {
-    fontSize: 10,
-    fontWeight: "800",
-    color: C.live,
-    letterSpacing: 1,
+    marginBottom: 12,
   },
   markCardTime: {
     fontSize: 12,
@@ -1058,6 +769,21 @@ const s = StyleSheet.create({
     color: C.muted,
     marginBottom: 4,
   },
+
+  // Scanning spinner row
+  scanningBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 12,
+    justifyContent: "center",
+  },
+  scanningText: {
+    fontSize: 13,
+    color: C.accent,
+    fontWeight: "600",
+  },
+
   markBtn: {
     backgroundColor: C.primary,
     borderRadius: 12,
@@ -1065,9 +791,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     marginTop: 4,
   },
-  markBtnLoading: {
-    opacity: 0.7,
-  },
+  markBtnLoading: { opacity: 0.7 },
   markBtnText: {
     color: "#FFF",
     fontWeight: "700",
@@ -1083,9 +807,7 @@ const s = StyleSheet.create({
     gap: 10,
     marginTop: 4,
   },
-  outOfRangeIcon: {
-    fontSize: 22,
-  },
+  outOfRangeIcon: { fontSize: 22 },
   outOfRangeTitle: {
     fontSize: 13,
     fontWeight: "700",
@@ -1109,9 +831,7 @@ const s = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#B7E4C7",
   },
-  alreadyMarkedIcon: {
-    fontSize: 28,
-  },
+  alreadyMarkedIcon: { fontSize: 28 },
   alreadyMarkedTitle: {
     fontSize: 15,
     fontWeight: "700",
@@ -1136,8 +856,6 @@ const s = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 3,
   },
-
-  // ── Section Heading ───────────────────────
   headingWrap: { marginBottom: 16 },
   headingText: {
     fontSize: 17,
@@ -1150,15 +868,11 @@ const s = StyleSheet.create({
     color: C.muted,
     marginTop: 3,
   },
-
-  // ── Divider ───────────────────────────────
   divider: {
     height: 1,
     backgroundColor: C.border,
     marginVertical: 14,
   },
-
-  // ── Filters ───────────────────────────────
   filterRow: {
     flexDirection: "row",
     marginBottom: 4,
@@ -1180,11 +894,9 @@ const s = StyleSheet.create({
     overflow: "hidden",
   },
   picker: {
-    height: 48,
+    height: 50,
     color: C.text,
   },
-
-  // ── Table ─────────────────────────────────
   tableHeader: {
     flexDirection: "row",
     alignItems: "center",
@@ -1264,9 +976,8 @@ const s = StyleSheet.create({
     color: C.muted,
     fontSize: 13,
     paddingVertical: 24,
+    lineHeight: 20,
   },
-
-  // ── Summary ───────────────────────────────
   statsRow: {
     flexDirection: "row",
     marginBottom: 4,
@@ -1330,12 +1041,5 @@ const s = StyleSheet.create({
     color: "#7B4000",
     fontWeight: "500",
     lineHeight: 17,
-  },
-  recoverText: {
-    fontSize: 12,
-    color: C.accent,
-    fontWeight: "600",
-    marginTop: 8,
-    textAlign: "center",
   },
 });

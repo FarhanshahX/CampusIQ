@@ -3,11 +3,15 @@ import { NavLink } from "react-router-dom";
 const Sidebar = () => {
   const navItems = [
     { name: "Dashboard", path: "/admin" },
+    { name: "Analytics", path: "/admin/analytics" },
+    { name: "Attendance", path: "/admin/attendance" },
+    { name: "Department", path: "/admin/department" },
     { name: "Teachers", path: "/admin/teachers" },
     { name: "Subjects", path: "/admin/subjects" },
     { name: "Students", path: "/admin/students" },
-    { name: "Department", path: "/admin/department" },
-    { name: "Settings", path: "/admin/settings" },
+    { name: "Announcements", path: "/admin/announcements" }, 
+    { name: "Profile", path: "/admin/profile" },
+    // { name: "Settings", path: "/admin/settings" },
   ];
 
   return (

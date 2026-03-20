@@ -1,522 +1,3 @@
-// import React, { useState, useEffect } from "react";
-// import {
-//   View,
-//   Text,
-//   StyleSheet,
-//   ScrollView,
-//   TouchableOpacity,
-//   TextInput,
-//   Alert,
-// } from "react-native";
-// import { Picker } from "@react-native-picker/picker";
-// import { LineChart } from "react-native-chart-kit";
-// import { Dimensions } from "react-native";
-// import { useAuth } from "../../context/AuthContext";
-// import api from "../../api/axios";
-
-// const screenWidth = Dimensions.get("window").width;
-
-// const AttendanceScreen = () => {
-//   const user = useAuth().user;
-//   const [subject, setSubject] = useState("");
-//   const [departmentId, setDepartmentId] = useState("");
-//   const [subjectId, setSubjectId] = useState("");
-//   const [subjects, setSubjects] = useState([]);
-//   const [department, setDepartment] = useState("");
-//   const [semester, setSemester] = useState("");
-
-//   const [sessionType, setSessionType] = useState("Lecture");
-//   const [section, setSection] = useState("A");
-//   const [duration, setDuration] = useState(10);
-//   const [topic, setTopic] = useState("");
-//   const [lecturePeriod, setLecturePeriod] = useState("");
-//   const [sessionActive, setSessionActive] = useState(false);
-//   const [timer, setTimer] = useState(0);
-
-//   const [selectedMonth, setSelectedMonth] = useState("Overall");
-//   const [selectedStudent, setSelectedStudent] = useState("All");
-
-//   const [sessionId, setSessionId] = useState(null);
-//   const [stats, setStats] = useState(null);
-
-//   // Example chart data
-//   // const attendanceData = [80, 82, 78, 85, 90];
-//   const attendanceData = stats?.map((s) => s.total) || [0];
-
-//   // ----------- FETCH SUBJECTS -----------
-//   const fetchSubjects = async () => {
-//     try {
-//       const res = await api.get(`/subjects/${departmentId}`);
-//       // Filter subjects assigned to this teacher
-//       const teacherSubjects = res.data.filter(
-//         (s) => s.assignedTeacher === user._id,
-//       );
-//       setSubjects(teacherSubjects);
-
-//       if (teacherSubjects.length > 0) {
-//         setSubjectId(teacherSubjects[0]._id);
-//         setSubject(teacherSubjects[0].subjectName);
-//         setSemester(teacherSubjects[0].semester);
-//       }
-//     } catch (error) {
-//       console.log("Error fetching subjects:", error);
-//     }
-//   };
-
-//   // ----------- FETCH DEPARTMENT -----------
-//   const fetchDepartment = async () => {
-//     try {
-//       if (subjects.length > 0) {
-//         setDepartment(subjects[0].departmentName);
-//         setSemester(subjects[0].semester);
-//       }
-//     } catch (error) {
-//       console.log("Error fetching department:", error);
-//     }
-//   };
-
-//   const fetchSubjectByTeacher = async (teacherId) => {
-//     try {
-//       const res = await api.get(`/subjects/teacher/${teacherId}`);
-//       setSubjects(res.data); // Set to the full array, not just [0]
-//       if (res.data.length > 0) {
-//         setSubjectId(res.data[0]._id);
-//         setDepartmentId(res.data[0].department._id); // Fixed: single department
-//         setSubject(res.data[0].subjectName);
-//         setDepartment(res.data[0].department.departmentName); // Fixed: single department
-//         setSemester(res.data[0].semester);
-//       }
-//     } catch (error) {
-//       console.log("Error fetching subjects by teacher:", error);
-//     }
-//   };
-
-//   // ----------- AUTO CALCULATE LECTURE PERIOD -----------
-//   const calculateLecturePeriod = () => {
-//     const now = new Date();
-
-//     let start = new Date(now);
-
-//     if (now.getMinutes() < 15) {
-//       start.setMinutes(0);
-//     } else if (now.getMinutes() < 45) {
-//       start.setMinutes(30);
-//     } else {
-//       start.setHours(now.getHours() + 1);
-//       start.setMinutes(0);
-//     }
-
-//     start.setSeconds(0);
-
-//     let end = new Date(start);
-//     end.setHours(start.getHours() + 1);
-
-//     const format = (d) =>
-//       `${d.getHours()}:${d.getMinutes().toString().padStart(2, "0")}`;
-
-//     setLecturePeriod(`${format(start)} - ${format(end)}`);
-//   };
-
-//   const fetchAttendanceStats = async () => {
-//     try {
-//       const res = await api.get(`/attendance/stats/subjectID`);
-
-//       setStats(res.data);
-//     } catch (error) {
-//       console.log(error);
-//     }
-//   };
-
-//   useEffect(() => {
-//     if (user) {
-//       fetchSubjectByTeacher(user._id);
-//     } else {
-//       console.log("user not found");
-//     }
-//     // fetchSubjects();
-//     // if (departmentId) {
-//     //   fetchDepartment();
-//     // }
-//     calculateLecturePeriod();
-//     fetchAttendanceStats();
-//   }, [user]);
-//   // ----------- START SESSION -----------
-
-//   const startAttendance = async () => {
-//     try {
-//       const [startTime, endTime] = lecturePeriod.split(" - ");
-
-//       const res = await api.post("/attendance/start", {
-//         subject: subjectId,
-//         department: departmentId,
-//         semester,
-//         section,
-//         sessionType,
-//         lectureStart: startTime,
-//         lectureEnd: endTime,
-//         duration,
-//         topic,
-//         user,
-//       });
-
-//       setSessionId(res.data.session._id);
-//       setSessionActive(true);
-//       setTimer(duration * 60);
-
-//       Alert.alert(
-//         "Attendance Started",
-//         "Students nearby can now mark attendance.",
-//       );
-//     } catch (error) {
-//       console.log(error.response?.data);
-//       Alert.alert("Error", "Failed to start attendance");
-//     }
-//   };
-
-//   // ----------- COUNTDOWN TIMER -----------
-//   useEffect(() => {
-//     let interval;
-
-//     if (sessionActive && timer > 0) {
-//       interval = setInterval(() => {
-//         setTimer((prev) => prev - 1);
-//       }, 1000);
-//     }
-
-//     return () => clearInterval(interval);
-//   }, [sessionActive, timer]);
-
-//   const closeSession = async () => {
-//     try {
-//       await api.put(`/attendance/close/${sessionId}`);
-
-//       setSessionActive(false);
-
-//       Alert.alert("Attendance Closed", "Attendance session has ended.");
-
-//       fetchAttendanceStats();
-//     } catch (error) {
-//       console.log(error);
-//     }
-//   };
-
-//   const formatTime = (sec) => {
-//     const m = Math.floor(sec / 60);
-//     const s = sec % 60;
-//     return `${m}:${s.toString().padStart(2, "0")}`;
-//   };
-
-//   return (
-//     <ScrollView style={styles.container}>
-//       {/* TITLE */}
-//       <Text style={styles.title}>Start Attendance</Text>
-//       <Text style={styles.subtitle}>
-//         Create a new attendance session for your class
-//       </Text>
-
-//       {/* CARD */}
-//       <View style={styles.card}>
-//         {/* SUBJECT */}
-//         {/* <Text style={styles.label}>Subject</Text>
-//         <Picker
-//           selectedValue={subjectId}
-//           onValueChange={(itemValue) => {
-//             setSubjectId(itemValue);
-//             const selectedSubj = subjects.find((s) => s._id === itemValue);
-//             if (selectedSubj) {
-//               setSubject(selectedSubj.subjectName || "");
-//               setSemester(selectedSubj.semester);
-//             }
-//           }}
-//         >
-//           <Picker.Item label="Select Subject" value="" />
-//           {subjects.map((subj) => (
-//             <Picker.Item
-//               key={subj._id}
-//               label={subj.subjectName}
-//               value={subj._id}
-//             />
-//           ))}
-//         </Picker> */}
-//         <Text style={styles.label}>Subject</Text>
-//         <Text style={styles.value}>{subject || ""}</Text>
-
-//         {/* LECTURE PERIOD */}
-//         <Text style={styles.label}>Lecture Period</Text>
-//         <TextInput
-//           value={lecturePeriod}
-//           onChangeText={setLecturePeriod}
-//           style={styles.input}
-//         />
-
-//         {/* CLASS */}
-//         <Text style={styles.label}>Class / Department</Text>
-//         <Text style={styles.value}>
-//           {department || ""} – Semester {semester || ""}
-//         </Text>
-
-//         {/* SESSION TYPE */}
-//         <Text style={styles.label}>Session Type</Text>
-
-//         <Picker
-//           selectedValue={sessionType}
-//           onValueChange={(itemValue) => setSessionType(itemValue)}
-//         >
-//           <Picker.Item label="Lecture" value="Lecture" />
-//           <Picker.Item label="Practical" value="Practical" />
-//           <Picker.Item label="Extra Class" value="Extra Class" />
-//         </Picker>
-
-//         {/* SECTION (ONLY PRACTICAL) */}
-//         {sessionType === "Practical" && (
-//           <>
-//             <Text style={styles.label}>Section</Text>
-
-//             <Picker
-//               selectedValue={section}
-//               onValueChange={(v) => setSection(v)}
-//             >
-//               <Picker.Item label="A" value="A" />
-//               <Picker.Item label="B" value="B" />
-//               <Picker.Item label="C" value="C" />
-//               <Picker.Item label="D" value="D" />
-//             </Picker>
-//           </>
-//         )}
-
-//         {/* SESSION DURATION */}
-//         <Text style={styles.label}>Session Duration</Text>
-
-//         <Picker
-//           selectedValue={duration}
-//           onValueChange={(itemValue) => setDuration(itemValue)}
-//         >
-//           <Picker.Item label="10 minutes" value={10} />
-//           <Picker.Item label="15 minutes" value={15} />
-//           <Picker.Item label="20 minutes" value={20} />
-//         </Picker>
-
-//         {/* TOPIC */}
-//         <Text style={styles.label}>Topic / Remarks</Text>
-
-//         <TextInput
-//           placeholder="Optional: Topic covered in this class"
-//           value={topic}
-//           onChangeText={setTopic}
-//           style={styles.input}
-//         />
-
-//         {/* START BUTTON */}
-//         {!sessionActive && (
-//           <TouchableOpacity
-//             style={styles.startButton}
-//             onPress={startAttendance}
-//           >
-//             <Text style={styles.startButtonText}>Start Attendance</Text>
-//           </TouchableOpacity>
-//         )}
-
-//         {/* TIMER */}
-//         {sessionActive && (
-//           <Text style={styles.timer}>
-//             Session Active • Time Left: {formatTime(timer)}
-//           </Text>
-//         )}
-//         {sessionActive && (
-//           <TouchableOpacity
-//             style={{
-//               backgroundColor: "red",
-//               padding: 12,
-//               borderRadius: 8,
-//               marginTop: 10,
-//             }}
-//             onPress={closeSession}
-//           >
-//             <Text style={{ color: "white", textAlign: "center" }}>
-//               End Attendance
-//             </Text>
-//           </TouchableOpacity>
-//         )}
-//       </View>
-
-//       {/* ATTENDANCE ANALYTICS */}
-
-//       <View style={styles.analyticsCard}>
-//         <Text style={styles.sectionTitle}>Attendance Analytics</Text>
-
-//         {/* FILTERS */}
-
-//         <View style={styles.filterRow}>
-//           <Picker
-//             style={styles.filter}
-//             selectedValue={selectedMonth}
-//             onValueChange={(v) => setSelectedMonth(v)}
-//           >
-//             <Picker.Item label="Overall" value="Overall" />
-//             <Picker.Item label="January" value="Jan" />
-//             <Picker.Item label="February" value="Feb" />
-//             <Picker.Item label="March" value="Mar" />
-//           </Picker>
-
-//           <Picker
-//             style={styles.filter}
-//             selectedValue={selectedStudent}
-//             onValueChange={(v) => setSelectedStudent(v)}
-//           >
-//             <Picker.Item label="All Students" value="All" />
-//             <Picker.Item label="Student 1" value="1" />
-//             <Picker.Item label="Student 2" value="2" />
-//           </Picker>
-//         </View>
-
-//         {/* CHART */}
-
-//         <LineChart
-//           data={{
-//             labels: ["W1", "W2", "W3", "W4", "W5"],
-//             datasets: [{ data: attendanceData }],
-//           }}
-//           width={screenWidth - 40}
-//           height={220}
-//           chartConfig={{
-//             backgroundGradientFrom: "#fff",
-//             backgroundGradientTo: "#fff",
-//             color: () => "#2e86de",
-//             labelColor: () => "#444",
-//           }}
-//         />
-
-//         {/* SUMMARY */}
-
-//         <View style={styles.summary}>
-//           <Text style={styles.summaryText}>Total Lectures: 24</Text>
-//           <Text style={styles.summaryText}>Average Attendance: 84%</Text>
-//           <Text style={styles.summaryText}>Lowest Attendance: 65%</Text>
-//         </View>
-//       </View>
-//     </ScrollView>
-//   );
-// };
-
-// export default AttendanceScreen;
-
-// const styles = StyleSheet.create({
-//   container: {
-//     flex: 1,
-//     backgroundColor: "#f5f6fa",
-//     padding: 16,
-//   },
-
-//   title: {
-//     fontSize: 24,
-//     fontWeight: "bold",
-//   },
-
-//   subtitle: {
-//     color: "#666",
-//     marginBottom: 15,
-//   },
-
-//   card: {
-//     backgroundColor: "#fff",
-//     padding: 16,
-//     borderRadius: 10,
-//     marginBottom: 20,
-//     elevation: 2,
-//   },
-
-//   label: {
-//     fontWeight: "600",
-//     marginTop: 10,
-//   },
-
-//   value: {
-//     backgroundColor: "#f1f2f6",
-//     padding: 10,
-//     borderRadius: 6,
-//     marginTop: 4,
-//   },
-
-//   input: {
-//     borderWidth: 1,
-//     borderColor: "#ccc",
-//     padding: 10,
-//     borderRadius: 6,
-//     marginTop: 5,
-//   },
-
-//   startButton: {
-//     backgroundColor: "#2e86de",
-//     padding: 14,
-//     borderRadius: 8,
-//     marginTop: 20,
-//     alignItems: "center",
-//   },
-
-//   startButtonText: {
-//     color: "#fff",
-//     fontWeight: "bold",
-//   },
-
-//   timer: {
-//     marginTop: 15,
-//     textAlign: "center",
-//     fontSize: 16,
-//     color: "green",
-//   },
-
-//   analyticsCard: {
-//     backgroundColor: "#fff",
-//     padding: 16,
-//     borderRadius: 10,
-//     elevation: 2,
-//   },
-
-//   sectionTitle: {
-//     fontSize: 18,
-//     fontWeight: "bold",
-//     marginBottom: 10,
-//   },
-
-//   filterRow: {
-//     flexDirection: "row",
-//     justifyContent: "space-between",
-//   },
-
-//   filter: {
-//     width: "48%",
-//   },
-
-//   summary: {
-//     marginTop: 10,
-//   },
-
-//   summaryText: {
-//     fontSize: 14,
-//     marginTop: 3,
-//   },
-// });
-
-/**
- * TeacherAttendanceScreen.jsx
- *
- * Drop-in replacement for the teacher attendance module.
- * Sections:
- *   1. Start Attendance Card
- *   2. Attendance History (filterable table)
- *   3. Attendance Summary (synced with filters)
- *
- * Dependencies (same as before):
- *   @react-native-picker/picker
- *   react-native-chart-kit  (used only if you want the chart widget)
- *
- * API endpoints consumed:
- *   GET  /subjects/teacher/:teacherId   → teacher's subjects
- *   POST /attendance/start              → start session
- *   PUT  /attendance/close/:sessionId   → close session
- *   GET  /attendance/history            → { history[], summary{} }  (new unified endpoint – see note)
- */
-
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
@@ -532,7 +13,9 @@ import {
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { useAuth } from "../../context/AuthContext";
+import TeacherHeader from "../../components/TeacherHeader";
 import api from "../../api/axios";
+import { startAdvertising, stopAdvertising } from "../../utils/BLEManager";
 
 // ─────────────────────────────────────────────
 // CONSTANTS
@@ -611,10 +94,8 @@ const pct = (a, t) => (t > 0 ? Math.round((a / t) * 100) : 0);
 // SUB-COMPONENTS
 // ─────────────────────────────────────────────
 
-/** Thin horizontal divider */
 const Divider = () => <View style={s.divider} />;
 
-/** Section heading */
 const SectionHeading = ({ title, subtitle }) => (
   <View style={s.headingWrap}>
     <Text style={s.headingText}>{title}</Text>
@@ -622,14 +103,12 @@ const SectionHeading = ({ title, subtitle }) => (
   </View>
 );
 
-/** Pill badge */
 const Badge = ({ label, color, bg }) => (
   <View style={[s.badge, { backgroundColor: bg }]}>
     <Text style={[s.badgeText, { color }]}>{label}</Text>
   </View>
 );
 
-/** Progress bar */
 const ProgressBar = ({ value }) => (
   <View style={s.progressTrack}>
     <View
@@ -645,7 +124,6 @@ const ProgressBar = ({ value }) => (
   </View>
 );
 
-/** Read-only info row */
 const InfoRow = ({ label, value }) => (
   <View style={s.infoRow}>
     <Text style={s.infoLabel}>{label}</Text>
@@ -653,7 +131,6 @@ const InfoRow = ({ label, value }) => (
   </View>
 );
 
-/** Stat tile for summary */
 const StatTile = ({ label, value, accent }) => (
   <View style={s.statTile}>
     <Text style={[s.statValue, accent && { color: C.accent }]}>{value}</Text>
@@ -661,15 +138,28 @@ const StatTile = ({ label, value, accent }) => (
   </View>
 );
 
+// ── BLE status indicator shown while session is active ────────────────────────
+const BleStatusChip = ({ advertising }) => (
+  <View
+    style={[
+      s.bleChip,
+      { backgroundColor: advertising ? "#E8F5E9" : "#FFF3E0" },
+    ]}
+  >
+    <Text style={s.bleChipIcon}>{advertising ? "📡" : "⚠️"}</Text>
+    <Text style={[s.bleChipText, { color: advertising ? C.success : C.warn }]}>
+      {advertising ? "BLE Broadcasting" : "BLE Stopped"}
+    </Text>
+  </View>
+);
+
 // ─────────────────────────────────────────────
 // MAIN SCREEN
 // ─────────────────────────────────────────────
 export default function TeacherAttendanceScreen() {
-  const { user } = useAuth();
+  const { user, activeSubject } = useAuth();
 
   // ── Session form ──────────────────────────
-  const [subjects, setSubjects] = useState([]);
-  const [selectedSubject, setSelectedSubject] = useState(null); // full subject object
   const [sessionType, setSessionType] = useState("Lecture");
   const [section, setSection] = useState("A");
   const [duration, setDuration] = useState(10);
@@ -679,13 +169,16 @@ export default function TeacherAttendanceScreen() {
   // ── Active session ────────────────────────
   const [sessionId, setSessionId] = useState(null);
   const [sessionActive, setSessionActive] = useState(false);
+  const [bluetoothToken, setBluetoothToken] = useState(null);
+  const [advertising, setAdvertising] = useState(false); // BLE broadcast state
   const [timer, setTimer] = useState(0);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
   // ── History / filters ─────────────────────
   const [filterMonth, setFilterMonth] = useState("overall");
   const [filterStudent, setFilterStudent] = useState("all");
-  const [allStudents, setAllStudents] = useState([]); // [{_id, name}]
+  const [filterType, setFilterType] = useState("all");
+  const [allStudents, setAllStudents] = useState([]);
   const [history, setHistory] = useState([]);
   const [summary, setSummary] = useState({
     totalClasses: 0,
@@ -699,13 +192,43 @@ export default function TeacherAttendanceScreen() {
   // INIT
   // ─────────────────────────────────────────
   useEffect(() => {
-    if (user) {
-      fetchSubjectsByTeacher(user._id);
-    }
     setLecturePeriod(snapToSlot());
+    if (user) recoverActiveSession();
   }, [user]);
 
-  // pulse animation for live dot
+  const recoverActiveSession = async () => {
+    try {
+      const res = await api.get(
+        `/attendance/active-teacher-session?teacherId=${user._id}`,
+      );
+      const sess = res.data;
+      if (sess) {
+        setSessionId(sess._id);
+        setBluetoothToken(sess.bluetoothToken);
+        setSessionActive(true);
+
+        // Calculate remaining time
+        const createdAt = new Date(sess.createdAt).getTime();
+        const now = new Date().getTime();
+        const elapsedSec = Math.floor((now - createdAt) / 1000);
+        const totalSec = sess.duration * 60;
+        const remaining = Math.max(0, totalSec - elapsedSec);
+
+        setTimer(remaining);
+        setSessionType(sess.sessionType);
+        if (sess.section) setSection(sess.section);
+        setDuration(sess.duration);
+        setTopic(sess.topic);
+        setLecturePeriod(
+          `${new Date(sess.lectureStart).getHours()}:${String(new Date(sess.lectureStart).getMinutes()).padStart(2, "0")} - ${new Date(sess.lectureEnd).getHours()}:${String(new Date(sess.lectureEnd).getMinutes()).padStart(2, "0")}`,
+        );
+      }
+    } catch (e) {
+      console.log("recoverActiveSession:", e);
+    }
+  };
+
+  // Pulse animation for live dot
   useEffect(() => {
     if (!sessionActive) return;
     const loop = Animated.loop(
@@ -726,64 +249,112 @@ export default function TeacherAttendanceScreen() {
     return () => loop.stop();
   }, [sessionActive]);
 
-  // countdown
+  // Countdown timer
   useEffect(() => {
     if (!sessionActive || timer <= 0) return;
     const id = setInterval(() => setTimer((p) => p - 1), 1000);
     return () => clearInterval(id);
   }, [sessionActive, timer]);
 
-  // auto-close when timer hits 0
+  // Auto-close when timer hits 0
   useEffect(() => {
     if (sessionActive && timer === 0) handleCloseSession();
-  }, [timer]);
+  }, [timer, sessionActive]);
 
-  // re-fetch history when filters change
+  // ── BLE: start advertising when a session becomes active ─────────────────
   useEffect(() => {
-    if (selectedSubject) fetchHistory();
-  }, [filterMonth, filterStudent, selectedSubject]);
+    if (!sessionActive || !bluetoothToken) return;
+
+    let active = true;
+
+    (async () => {
+      try {
+        await startAdvertising(bluetoothToken);
+        if (active) setAdvertising(true);
+      } catch (err) {
+        console.warn("[BLE] Could not start advertising:", err.message);
+        // Non-fatal — session still works; BLE is just unavailable on this device
+        Alert.alert(
+          "Bluetooth Unavailable",
+          "Could not start BLE broadcast. Students will not be proximity-verified.\n\n" +
+            err.message,
+        );
+        if (active) setAdvertising(false);
+      }
+    })();
+
+    return () => {
+      active = false;
+    };
+  }, [sessionActive, bluetoothToken]);
+
+  // ── BLE: stop advertising when the session is no longer active ────────────
+  useEffect(() => {
+    if (!sessionActive && advertising) {
+      stopAdvertising().catch(console.warn);
+      setAdvertising(false);
+    }
+  }, [sessionActive]);
+
+  // Stop BLE on unmount (but DON'T close the server session)
+  useEffect(() => {
+    return () => {
+      if (advertising) {
+        stopAdvertising().catch(console.warn);
+      }
+    };
+  }, [advertising]);
+
+  // Re-fetch history when filters change
+  useEffect(() => {
+    if (activeSubject) fetchHistory();
+  }, [filterMonth, filterStudent, filterType, activeSubject]);
 
   // ─────────────────────────────────────────
   // API CALLS
   // ─────────────────────────────────────────
-  const fetchSubjectsByTeacher = async (teacherId) => {
-    try {
-      const res = await api.get(`/subjects/teacher/${teacherId}`);
-      const data = res.data;
-      setSubjects(data);
-      if (data.length > 0) {
-        setSelectedSubject(data[0]);
-      }
-    } catch (e) {
-      console.log("fetchSubjectsByTeacher:", e);
-    }
-  };
 
   const handleStartSession = async () => {
-    if (!selectedSubject) {
-      Alert.alert("No Subject", "No subject found for your account.");
+    if (!activeSubject) {
+      Alert.alert(
+        "No Subject",
+        "No active subject found. Please select one in your Profile.",
+      );
       return;
     }
     try {
+      // ── Step 1: Get total count of enrolled students ──────────────────────
+      // We call the history endpoint with no filters to get the 'students' list
+      // which our backend now populates with all enrolled students.
+      const historyRes = await api.get(
+        `/attendance/history?subjectId=${activeSubject._id}`,
+      );
+      const enrolledCount = historyRes.data.students?.length || 0;
+
       const [startTime, endTime] = lecturePeriod.split(" - ");
       const res = await api.post("/attendance/start", {
-        subject: selectedSubject._id,
-        department: selectedSubject.department._id,
-        semester: selectedSubject.semester,
+        subject: activeSubject._id,
+        department: activeSubject.department._id,
+        semester: activeSubject.semester,
         section,
         sessionType,
         lectureStart: startTime.trim(),
         lectureEnd: endTime.trim(),
         duration,
         topic,
+        totalStudents: enrolledCount, // ← pass the count here
         user: user._id,
       });
-      setSessionId(res.data.session._id);
+
+      const sess = res.data.session;
+      setSessionId(sess._id);
+      setBluetoothToken(sess.bluetoothToken); // ← triggers the BLE useEffect above
       setSessionActive(true);
       setTimer(duration * 60);
+
       Alert.alert(
         "Session Started",
-        "Students nearby can now mark attendance.",
+        "BLE broadcasting started. Students nearby can now mark attendance.",
       );
     } catch (e) {
       console.log(e.response?.data);
@@ -796,9 +367,12 @@ export default function TeacherAttendanceScreen() {
 
   const handleCloseSession = async () => {
     try {
-      await api.put(`/attendance/close/${sessionId}`);
+      await api.put(`/attendance/close/${sessionId}`, { userId: user._id });
+      await stopAdvertising(); // ← stop BLE broadcast
+      setAdvertising(false);
       setSessionActive(false);
       setSessionId(null);
+      setBluetoothToken(null);
       Alert.alert("Session Ended", "Attendance session has been closed.");
       fetchHistory();
     } catch (e) {
@@ -806,27 +380,14 @@ export default function TeacherAttendanceScreen() {
     }
   };
 
-  /**
-   * NOTE: You'll need a backend route:
-   *   GET /attendance/history?subjectId=&month=&studentId=
-   * that returns { history: [...], summary: {...}, students: [...] }
-   *
-   * history items shape:
-   *   { _id, date, studentName, studentRoll, status, sessionType, topic }
-   *
-   * summary shape:
-   *   { totalClasses, attended, absent, rate }
-   *
-   * students shape:
-   *   [{ _id, name, roll }]
-   */
   const fetchHistory = useCallback(async () => {
-    if (!selectedSubject) return;
+    if (!activeSubject) return;
     setHistoryLoading(true);
     try {
-      const params = new URLSearchParams({ subjectId: selectedSubject._id });
+      const params = new URLSearchParams({ subjectId: activeSubject._id });
       if (filterMonth !== "overall") params.append("month", filterMonth);
       if (filterStudent !== "all") params.append("studentId", filterStudent);
+      if (filterType !== "all") params.append("type", filterType);
 
       const res = await api.get(`/attendance/history?${params.toString()}`);
       setHistory(res.data.history || []);
@@ -846,7 +407,7 @@ export default function TeacherAttendanceScreen() {
     } finally {
       setHistoryLoading(false);
     }
-  }, [selectedSubject, filterMonth, filterStudent]);
+  }, [activeSubject, filterMonth, filterStudent, filterType]);
 
   // ─────────────────────────────────────────
   // RENDER HELPERS
@@ -857,8 +418,7 @@ export default function TeacherAttendanceScreen() {
       <Text style={[s.tableCell, { flex: 2.5 }]} numberOfLines={1}>
         {item.studentName}
       </Text>
-      <Text style={[s.tableCell, { flex: 1.2 }]}>{item.sessionType}</Text>
-      <View style={[s.tableCell, { flex: 1.2, alignItems: "center" }]}>
+      <View style={[s.tableCell, { flex: 1.4, alignItems: "center" }]}>
         <Badge
           label={item.status}
           color={item.status === "PRESENT" ? C.success : C.danger}
@@ -872,265 +432,309 @@ export default function TeacherAttendanceScreen() {
   // RENDER
   // ─────────────────────────────────────────
   return (
-    <ScrollView style={s.screen} contentContainerStyle={{ paddingBottom: 40 }}>
-      {/* ══════════════════════════════════════
-          PAGE HEADER
-      ══════════════════════════════════════ */}
-      <View style={s.pageHeader}>
-        <View>
-          <Text style={s.pageTitle}>Attendance</Text>
-          <Text style={s.pageSub}>
-            Manage sessions & track student presence
-          </Text>
-        </View>
-        {sessionActive && (
-          <View style={s.liveChip}>
-            <Animated.View
-              style={[s.liveDot, { transform: [{ scale: pulseAnim }] }]}
-            />
-            <Text style={s.liveText}>LIVE</Text>
-          </View>
-        )}
-      </View>
-
-      {/* ══════════════════════════════════════
-          SECTION 1 — START / ACTIVE SESSION
-      ══════════════════════════════════════ */}
-      <View style={s.card}>
-        <SectionHeading
-          title={sessionActive ? "Session Active" : "Start Attendance"}
-          subtitle={
-            sessionActive
-              ? `Time remaining: ${formatTimer(timer)}`
-              : "Configure and launch an attendance session"
-          }
-        />
-
-        {/* Subject + Department (read-only) */}
-        <InfoRow label="Subject" value={selectedSubject?.subjectName} />
-        <InfoRow
-          label="Department & Semester"
-          value={
-            selectedSubject
-              ? `${selectedSubject.department?.departmentName} • Sem ${selectedSubject.semester}`
-              : undefined
-          }
-        />
-
-        <Divider />
-
-        {/* Lecture Period */}
-        <Text style={s.fieldLabel}>Lecture Period</Text>
-        <TextInput
-          style={s.textInput}
-          value={lecturePeriod}
-          onChangeText={setLecturePeriod}
-          editable={!sessionActive}
-          placeholder="e.g. 9:00 - 10:00"
-          placeholderTextColor={C.muted}
-        />
-
-        {/* Session Type */}
-        <Text style={s.fieldLabel}>Session Type</Text>
-        <View style={[s.pickerWrap, sessionActive && s.disabled]}>
-          <Picker
-            selectedValue={sessionType}
-            onValueChange={setSessionType}
-            enabled={!sessionActive}
-            style={s.picker}
-          >
-            {SESSION_TYPES.map((t) => (
-              <Picker.Item key={t} label={t} value={t} />
-            ))}
-          </Picker>
-        </View>
-
-        {/* Section — only for Practical */}
-        {sessionType === "Practical" && (
-          <>
-            <Text style={s.fieldLabel}>Batch / Section</Text>
-            <View style={[s.pickerWrap, sessionActive && s.disabled]}>
-              <Picker
-                selectedValue={section}
-                onValueChange={setSection}
-                enabled={!sessionActive}
-                style={s.picker}
-              >
-                {SECTIONS.map((sec) => (
-                  <Picker.Item key={sec} label={`Section ${sec}`} value={sec} />
-                ))}
-              </Picker>
-            </View>
-          </>
-        )}
-
-        {/* Duration */}
-        <Text style={s.fieldLabel}>Marking Window</Text>
-        <View style={[s.pickerWrap, sessionActive && s.disabled]}>
-          <Picker
-            selectedValue={duration}
-            onValueChange={setDuration}
-            enabled={!sessionActive}
-            style={s.picker}
-          >
-            {DURATIONS.map((d) => (
-              <Picker.Item key={d.value} label={d.label} value={d.value} />
-            ))}
-          </Picker>
-        </View>
-
-        {/* Topic */}
-        <Text style={s.fieldLabel}>Topic / Remarks</Text>
-        <TextInput
-          style={[s.textInput, { minHeight: 64, textAlignVertical: "top" }]}
-          value={topic}
-          onChangeText={setTopic}
-          placeholder="Optional — topic covered today"
-          placeholderTextColor={C.muted}
-          multiline
-          editable={!sessionActive}
-        />
-
-        {/* Action Buttons */}
-        {!sessionActive ? (
-          <TouchableOpacity style={s.primaryBtn} onPress={handleStartSession}>
-            <Text style={s.primaryBtnText}>Start Attendance Session</Text>
-          </TouchableOpacity>
-        ) : (
+    <>
+      <TeacherHeader />
+      <ScrollView
+        style={s.screen}
+        contentContainerStyle={{ paddingBottom: 40 }}
+      >
+        {/* PAGE HEADER */}
+        <View style={s.pageHeader}>
           <View>
-            {/* Timer bar */}
-            <ProgressBar value={(timer / (duration * 60)) * 100} />
-            <Text style={s.timerLabel}>
-              {formatTimer(timer)} remaining · Bluetooth active
+            <Text style={s.pageTitle}>Attendance</Text>
+            <Text style={s.pageSub}>
+              Manage sessions & track student presence
             </Text>
-            <TouchableOpacity style={s.dangerBtn} onPress={handleCloseSession}>
-              <Text style={s.dangerBtnText}>End Session Early</Text>
-            </TouchableOpacity>
           </View>
-        )}
-      </View>
+          {sessionActive && (
+            <View style={s.liveChip}>
+              <Animated.View
+                style={[s.liveDot, { transform: [{ scale: pulseAnim }] }]}
+              />
+              <Text style={s.liveText}>LIVE</Text>
+            </View>
+          )}
+        </View>
 
-      {/* ══════════════════════════════════════
-          SECTION 2 — ATTENDANCE HISTORY
-      ══════════════════════════════════════ */}
-      <View style={s.card}>
-        <SectionHeading
-          title="Attendance History"
-          subtitle="Filter by month or individual student"
-        />
+        {/* ══════════════════════════════════════
+            SECTION 1 — SESSION CARD
+        ══════════════════════════════════════ */}
+        <View style={s.card}>
+          {!sessionActive ? (
+            <>
+              <SectionHeading
+                title="Start Attendance Session"
+                subtitle={`Subject: ${activeSubject?.subjectName || "None selected"}`}
+              />
 
-        {/* Filters row */}
-        <View style={s.filterRow}>
-          <View style={s.filterItem}>
-            <Text style={s.filterLabel}>Month</Text>
-            <View style={s.pickerWrap}>
-              <Picker
-                selectedValue={filterMonth}
-                onValueChange={setFilterMonth}
-                style={s.picker}
+              {/* Session Type */}
+              <Text style={s.fieldLabel}>Session Type</Text>
+              <View style={s.pickerWrap}>
+                <Picker
+                  selectedValue={sessionType}
+                  onValueChange={setSessionType}
+                  style={s.picker}
+                >
+                  {SESSION_TYPES.map((t) => (
+                    <Picker.Item key={t} label={t} value={t} />
+                  ))}
+                </Picker>
+              </View>
+
+              {/* Section (Practical only) */}
+              {sessionType === "Practical" && (
+                <>
+                  <Text style={s.fieldLabel}>Batch / Section</Text>
+                  <View style={s.pickerWrap}>
+                    <Picker
+                      selectedValue={section}
+                      onValueChange={setSection}
+                      style={s.picker}
+                    >
+                      {SECTIONS.map((sec) => (
+                        <Picker.Item
+                          key={sec}
+                          label={`Batch ${sec}`}
+                          value={sec}
+                        />
+                      ))}
+                    </Picker>
+                  </View>
+                </>
+              )}
+
+              {/* Lecture Period */}
+              <Text style={s.fieldLabel}>Lecture Period (HH:MM - HH:MM)</Text>
+              <TextInput
+                style={s.textInput}
+                value={lecturePeriod}
+                onChangeText={setLecturePeriod}
+                placeholder="e.g. 9:00 - 10:00"
+                placeholderTextColor={C.muted}
+              />
+
+              {/* Duration */}
+              <Text style={s.fieldLabel}>Attendance Window</Text>
+              <View style={s.pickerWrap}>
+                <Picker
+                  selectedValue={duration}
+                  onValueChange={setDuration}
+                  style={s.picker}
+                >
+                  {DURATIONS.map((d) => (
+                    <Picker.Item
+                      key={d.value}
+                      label={d.label}
+                      value={d.value}
+                    />
+                  ))}
+                </Picker>
+              </View>
+
+              {/* Topic */}
+              <Text style={s.fieldLabel}>Topic (optional)</Text>
+              <TextInput
+                style={s.textInput}
+                value={topic}
+                onChangeText={setTopic}
+                placeholder="e.g. Linked Lists - Insertion"
+                placeholderTextColor={C.muted}
+              />
+
+              <TouchableOpacity
+                style={s.primaryBtn}
+                onPress={handleStartSession}
+                activeOpacity={0.85}
               >
-                {MONTHS.map((m) => (
-                  <Picker.Item key={m.value} label={m.label} value={m.value} />
-                ))}
-              </Picker>
+                <Text style={s.primaryBtnText}>Start Attendance Session</Text>
+              </TouchableOpacity>
+            </>
+          ) : (
+            <>
+              <SectionHeading
+                title="Session Live"
+                subtitle="Students within Bluetooth range can mark attendance"
+              />
+
+              {/* BLE status chip */}
+              <BleStatusChip advertising={advertising} />
+
+              <InfoRow label="Subject" value={activeSubject?.subjectName} />
+              <InfoRow label="Session Type" value={sessionType} />
+              {sessionType === "Practical" && (
+                <InfoRow label="Batch" value={section} />
+              )}
+              <InfoRow label="Period" value={lecturePeriod} />
+              <InfoRow label="Topic" value={topic || "—"} />
+
+              <Divider />
+
+              {/* Timer */}
+              <Text style={s.timerLabel}>Time remaining</Text>
+              <Text
+                style={{
+                  textAlign: "center",
+                  fontSize: 42,
+                  fontWeight: "800",
+                  color: timer < 60 ? C.danger : C.primary,
+                  letterSpacing: -1,
+                }}
+              >
+                {formatTimer(timer)}
+              </Text>
+
+              <TouchableOpacity
+                style={s.dangerBtn}
+                onPress={handleCloseSession}
+                activeOpacity={0.85}
+              >
+                <Text style={s.dangerBtnText}>
+                  ⏹ End Session &amp; Stop BLE
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
+
+        {/* ══════════════════════════════════════
+            SECTION 2 — HISTORY
+        ══════════════════════════════════════ */}
+        <View style={s.card}>
+          <SectionHeading
+            title="Attendance History"
+            subtitle={activeSubject?.subjectName}
+          />
+
+          {/* Summary tiles */}
+          <View style={s.statsRow}>
+            <StatTile label="Classes" value={summary.totalClasses} />
+            <StatTile label="Present" value={summary.attended} accent />
+            <StatTile label="Absent" value={summary.absent} />
+          </View>
+          <View style={s.rateRow}>
+            <Text style={s.rateLabel}>Attendance Rate</Text>
+            <Text
+              style={[
+                s.rateValue,
+                {
+                  color:
+                    summary.rate >= 75
+                      ? C.success
+                      : summary.rate >= 50
+                        ? C.warn
+                        : C.danger,
+                },
+              ]}
+            >
+              {summary.rate}%
+            </Text>
+          </View>
+          <ProgressBar value={summary.rate} />
+
+          {summary.rate < 75 && summary.totalClasses > 0 && (
+            <View style={s.warnBanner}>
+              <Text style={s.warnText}>
+                ⚠️ Class attendance is below 75%. Review absenteeism.
+              </Text>
+            </View>
+          )}
+
+          <Divider />
+
+          {/* Filters */}
+          <View style={s.filterRow}>
+            <View style={[s.filterItem, { marginRight: 8 }]}>
+              <Text style={s.filterLabel}>Month</Text>
+              <View style={s.pickerWrap}>
+                <Picker
+                  selectedValue={filterMonth}
+                  onValueChange={setFilterMonth}
+                  style={s.picker}
+                >
+                  {MONTHS.map((m) => (
+                    <Picker.Item
+                      key={m.value}
+                      label={m.label}
+                      value={m.value}
+                    />
+                  ))}
+                </Picker>
+              </View>
+            </View>
+            <View style={s.filterItem}>
+              <Text style={s.filterLabel}>Type</Text>
+              <View style={s.pickerWrap}>
+                <Picker
+                  selectedValue={filterType}
+                  onValueChange={setFilterType}
+                  style={s.picker}
+                >
+                  <Picker.Item label="All" value="all" />
+                  {SESSION_TYPES.map((t) => (
+                    <Picker.Item key={t} label={t} value={t} />
+                  ))}
+                </Picker>
+              </View>
             </View>
           </View>
 
-          <View style={[s.filterItem, { marginLeft: 10 }]}>
-            <Text style={s.filterLabel}>Student</Text>
-            <View style={s.pickerWrap}>
-              <Picker
-                selectedValue={filterStudent}
-                onValueChange={setFilterStudent}
-                style={s.picker}
-              >
-                <Picker.Item label="All Students" value="all" />
-                {allStudents.map((st) => (
-                  <Picker.Item key={st._id} label={st.name} value={st._id} />
-                ))}
-              </Picker>
-            </View>
-          </View>
-        </View>
+          {/* Student filter */}
+          {allStudents.length > 0 && (
+            <>
+              <Text style={s.filterLabel}>Student</Text>
+              <View style={s.pickerWrap}>
+                <Picker
+                  selectedValue={filterStudent}
+                  onValueChange={setFilterStudent}
+                  style={s.picker}
+                >
+                  <Picker.Item label="All Students" value="all" />
+                  {allStudents.map((st) => (
+                    <Picker.Item
+                      key={st._id}
+                      label={`${st.name} (${st.roll})`}
+                      value={st._id}
+                    />
+                  ))}
+                </Picker>
+              </View>
+            </>
+          )}
 
-        <Divider />
+          <Divider />
 
-        {/* Table header */}
-        <View style={s.tableHeader}>
-          <Text style={[s.tableHeadCell, { flex: 1.8 }]}>Date</Text>
-          <Text style={[s.tableHeadCell, { flex: 2.5 }]}>Student</Text>
-          <Text style={[s.tableHeadCell, { flex: 1.2 }]}>Type</Text>
-          <Text style={[s.tableHeadCell, { flex: 1.2 }]}>Status</Text>
-        </View>
-
-        {/* Table body */}
-        {historyLoading ? (
-          <ActivityIndicator color={C.accent} style={{ marginVertical: 24 }} />
-        ) : history.length === 0 ? (
-          <Text style={s.emptyText}>
-            No records found for the selected filters.
-          </Text>
-        ) : (
-          <FlatList
-            data={history}
-            keyExtractor={(item) => item._id}
-            renderItem={renderHistoryRow}
-            scrollEnabled={false}
-          />
-        )}
-      </View>
-
-      {/* ══════════════════════════════════════
-          SECTION 3 — ATTENDANCE SUMMARY
-      ══════════════════════════════════════ */}
-      <View style={s.card}>
-        <SectionHeading
-          title="Attendance Summary"
-          subtitle={
-            filterMonth !== "overall" || filterStudent !== "all"
-              ? `Filtered · ${
-                  MONTHS.find((m) => m.value === filterMonth)?.label ??
-                  "Overall"
-                }${filterStudent !== "all" ? " · Selected Student" : ""}`
-              : "Overall statistics"
-          }
-        />
-
-        {/* Stat tiles */}
-        <View style={s.statsRow}>
-          <StatTile label="Total Classes" value={summary.totalClasses} />
-          <StatTile label="Attended" value={summary.attended} accent />
-          <StatTile label="Absent" value={summary.absent} />
-          <StatTile
-            label="Rate"
-            value={`${summary.rate ?? pct(summary.attended, summary.totalClasses)}%`}
-            accent
-          />
-        </View>
-
-        <Divider />
-
-        {/* Attendance rate bar */}
-        <View style={s.rateRow}>
-          <Text style={s.rateLabel}>Attendance Rate</Text>
-          <Text style={s.rateValue}>
-            {summary.rate ?? pct(summary.attended, summary.totalClasses)}%
-          </Text>
-        </View>
-        <ProgressBar
-          value={summary.rate ?? pct(summary.attended, summary.totalClasses)}
-        />
-
-        {/* Threshold note */}
-        {(summary.rate ?? pct(summary.attended, summary.totalClasses)) < 75 && (
-          <View style={s.warnBanner}>
-            <Text style={s.warnText}>
-              ⚠ Attendance below 75% threshold. Students may be flagged.
+          {/* Table */}
+          {historyLoading ? (
+            <ActivityIndicator
+              color={C.accent}
+              style={{ marginVertical: 20 }}
+            />
+          ) : history.length === 0 ? (
+            <Text style={s.emptyText}>
+              No records found for the selected filters.
             </Text>
-          </View>
-        )}
-      </View>
-    </ScrollView>
+          ) : (
+            <>
+              <View style={s.tableHeader}>
+                <Text style={[s.tableHeadCell, { flex: 1.8 }]}>Date</Text>
+                <Text style={[s.tableHeadCell, { flex: 2.5 }]}>Student</Text>
+                <Text
+                  style={[s.tableHeadCell, { flex: 1.2, textAlign: "center" }]}
+                >
+                  Status
+                </Text>
+              </View>
+              <FlatList
+                data={history}
+                keyExtractor={(item) => item._id}
+                renderItem={renderHistoryRow}
+                scrollEnabled={false}
+              />
+            </>
+          )}
+        </View>
+      </ScrollView>
+    </>
   );
 }
 
@@ -1143,8 +747,6 @@ const s = StyleSheet.create({
     backgroundColor: C.bg,
     paddingHorizontal: 16,
   },
-
-  // ── Page Header ──────────────────────────
   pageHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1184,8 +786,20 @@ const s = StyleSheet.create({
     color: C.live,
     letterSpacing: 1,
   },
-
-  // ── Card ─────────────────────────────────
+  bleChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginBottom: 14,
+    gap: 8,
+  },
+  bleChipIcon: { fontSize: 16 },
+  bleChipText: {
+    fontSize: 13,
+    fontWeight: "700",
+  },
   card: {
     backgroundColor: C.surface,
     borderRadius: 16,
@@ -1197,11 +811,7 @@ const s = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 3,
   },
-
-  // ── Section Heading ───────────────────────
-  headingWrap: {
-    marginBottom: 16,
-  },
+  headingWrap: { marginBottom: 16 },
   headingText: {
     fontSize: 17,
     fontWeight: "700",
@@ -1213,15 +823,11 @@ const s = StyleSheet.create({
     color: C.muted,
     marginTop: 3,
   },
-
-  // ── Divider ───────────────────────────────
   divider: {
     height: 1,
     backgroundColor: C.border,
     marginVertical: 14,
   },
-
-  // ── Info Row ─────────────────────────────
   infoRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1242,8 +848,6 @@ const s = StyleSheet.create({
     maxWidth: "60%",
     textAlign: "right",
   },
-
-  // ── Form Fields ───────────────────────────
   fieldLabel: {
     fontSize: 12,
     fontWeight: "700",
@@ -1271,14 +875,9 @@ const s = StyleSheet.create({
     overflow: "hidden",
   },
   picker: {
-    height: 48,
+    height: 50,
     color: C.text,
   },
-  disabled: {
-    opacity: 0.5,
-  },
-
-  // ── Buttons ───────────────────────────────
   primaryBtn: {
     backgroundColor: C.primary,
     borderRadius: 12,
@@ -1305,8 +904,6 @@ const s = StyleSheet.create({
     fontWeight: "700",
     fontSize: 14,
   },
-
-  // ── Timer ─────────────────────────────────
   timerLabel: {
     textAlign: "center",
     fontSize: 12,
@@ -1314,8 +911,6 @@ const s = StyleSheet.create({
     marginTop: 6,
     marginBottom: 12,
   },
-
-  // ── Progress ──────────────────────────────
   progressTrack: {
     height: 6,
     backgroundColor: C.border,
@@ -1327,15 +922,11 @@ const s = StyleSheet.create({
     height: 6,
     borderRadius: 99,
   },
-
-  // ── Filters ───────────────────────────────
   filterRow: {
     flexDirection: "row",
     marginBottom: 4,
   },
-  filterItem: {
-    flex: 1,
-  },
+  filterItem: { flex: 1 },
   filterLabel: {
     fontSize: 11,
     fontWeight: "700",
@@ -1344,8 +935,6 @@ const s = StyleSheet.create({
     textTransform: "uppercase",
     marginBottom: 5,
   },
-
-  // ── Table ─────────────────────────────────
   tableHeader: {
     flexDirection: "row",
     paddingVertical: 8,
@@ -1364,14 +953,12 @@ const s = StyleSheet.create({
   tableRow: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 10,
+    paddingVertical: 14,
     paddingHorizontal: 4,
     borderBottomWidth: 1,
     borderBottomColor: C.border,
   },
-  tableRowAlt: {
-    backgroundColor: "#FAFBFF",
-  },
+  tableRowAlt: { backgroundColor: "#FAFBFF" },
   tableCell: {
     fontSize: 13,
     color: C.text,
@@ -1382,8 +969,6 @@ const s = StyleSheet.create({
     fontSize: 13,
     paddingVertical: 24,
   },
-
-  // ── Badge ────────────────────────────────
   badge: {
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -1394,8 +979,6 @@ const s = StyleSheet.create({
     fontWeight: "700",
     letterSpacing: 0.4,
   },
-
-  // ── Summary Stats ─────────────────────────
   statsRow: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1438,8 +1021,6 @@ const s = StyleSheet.create({
     color: C.primary,
     fontWeight: "800",
   },
-
-  // ── Warn Banner ───────────────────────────
   warnBanner: {
     backgroundColor: "#FFF3E0",
     borderRadius: 8,

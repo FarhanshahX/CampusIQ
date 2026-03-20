@@ -1,4 +1,5 @@
 const SubjectScore = require("../models/SubjectScore.js");
+const Subject = require("../models/Subject.js");
 const Student = require("../models/Student.js");
 const mongoose = require("mongoose");
 
@@ -98,21 +99,18 @@ const updateStudentMarks = async (req, res) => {
   }
 };
 
-// Store lock status per subject (in-memory, can be replaced with DB)
-const subjectLockStatus = {};
-
 const lockMarks = async (req, res) => {
   try {
-    const { subjectName, isLocked } = req.body;
+    const { subjectId } = req.params;
+    const { isLocked } = req.body;
 
-    // Store lock state per subject
-    subjectLockStatus[subjectName] = Boolean(isLocked);
-
+    const subject = await Subject.findOne({ _id: subjectId });
+    subject.Lock = isLocked;
+    await subject.save();
     res.json({
       message: isLocked
-        ? `Marks locked for ${subjectName}`
-        : `Marks unlocked for ${subjectName}`,
-      isLocked: subjectLockStatus[subjectName],
+        ? `Marks locked for ${subjectId}`
+        : `Marks unlocked for ${subjectId}`,
     });
   } catch (err) {
     res.status(500).json({ message: "Error toggling marks lock" });
@@ -121,10 +119,12 @@ const lockMarks = async (req, res) => {
 
 const getMarkLockStatus = async (req, res) => {
   try {
-    const { subjectName } = req.params;
+    const { subjectId } = req.params;
 
+    const subject = await Subject.findOne({ _id: subjectId });
+    const isLocked = subject.Lock;
     res.json({
-      isLocked: subjectLockStatus[subjectName] || false,
+      isLocked,
     });
   } catch (err) {
     res.status(500).json({ message: "Error fetching lock status" });
@@ -132,7 +132,6 @@ const getMarkLockStatus = async (req, res) => {
 };
 
 const getStudentScores = async (req, res) => {
-  console.log("Received request for student scores with params:", req.params);
   try {
     const { studentId, subjectId } = req.params;
 
@@ -141,8 +140,6 @@ const getStudentScores = async (req, res) => {
       student: studentId,
       subjectID: subjectId,
     });
-
-    console.log("Fetched student score:", studentScore);
 
     if (!studentScore) {
       return res.status(404).json({ message: "Score record not found" });
