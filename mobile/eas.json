@@ -9,6 +9,9 @@
       "distribution": "internal"
     },
     "preview": {
+      "env": {
+        "NODE_ENV": "production"
+      },
       "distribution": "internal",
       "android": {
         "buildType": "apk"
