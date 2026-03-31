@@ -125,7 +125,7 @@ const TeacherHeader = () => {
 
 const styles = StyleSheet.create({
   container: {
-    paddingTop: 25,
+    paddingTop: 0,
     paddingHorizontal: 15,
     paddingBottom: 15,
     backgroundColor: "#fff",

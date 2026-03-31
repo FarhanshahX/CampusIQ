@@ -1,97 +1,3 @@
-// import Student from "../models/Student.js";
-// import cloudinary from "../config/cloudinary.js";
-
-// export const createStudent = async (req, res) => {
-//   const {
-//     registrationNumber,
-//     firstName,
-//     lastName,
-//     gender,
-//     dateOfBirth,
-//     email,
-//     mobile,
-//     college,
-//     department,
-//     section,
-//     rollNumber,
-//     studentPhoto,
-//     password,
-//     confirmPassword,
-//   } = req.body;
-
-//   const existing = await Student.findOne({ registrationNumber });
-//   if (existing) {
-//     return res.status(400).json({ message: "Student already exists" });
-//   }
-
-// const uploadToCloudinary = (file, folder) => {
-//   return new Promise((resolve, reject) => {
-//     cloudinary.uploader
-//       .upload_stream({ folder, resource_type: "image" }, (error, result) => {
-//         if (error) reject(error);
-//         else resolve(result);
-//       })
-//       .end(file.buffer);
-//   });
-// };
-
-// let studentPhotoUrl = "";
-// let idCardPhotoUrl = "";
-
-// if (req.files?.studentPhoto) {
-//   const result = await uploadToCloudinary(
-//     req.files.studentPhoto[0],
-//     "students/photos",
-//   );
-//   studentPhotoUrl = result.secure_url;
-// }
-
-//   if (req.files?.idCardPhoto) {
-//     const result = await uploadToCloudinary(
-//       req.files.idCardPhoto[0],
-//       "students/id-cards",
-//     );
-//     idCardPhotoUrl = result.secure_url;
-//   }
-
-//   if (!password || !confirmPassword) {
-//     return res
-//       .status(400)
-//       .json({ message: "Password and confirmPassword are required" });
-//   }
-
-//   if (password !== confirmPassword) {
-//     return res.status(400).json({ message: "Passwords do not match" });
-//   }
-
-//   const student = await Student.create({
-//     registrationNumber,
-//     firstName,
-//     lastName,
-//     gender,
-//     dateOfBirth,
-//     email,
-//     mobile,
-//     college,
-//     department,
-//     section,
-//     rollNumber,
-//     studentPhoto,
-//     studentPhoto: studentPhotoUrl,
-//     password,
-//   });
-
-//   res.status(201).json({
-//     message: "Student created successfully",
-//     student,
-//   });
-// };
-
-// export const getStudents = async (req, res) => {
-//   const students = await Student.find().select("-password");
-//   res.json(students);
-// };
-
 const Student = require("../models/Student.js");
 const PreApprovedStudent = require("../models/PreApprovedStudent.js");
 const Department = require("../models/Department.js");
@@ -127,7 +33,6 @@ const initiateRegistration = async (req, res) => {
 
     // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    console.log(otp);
 
     approvedStudent.otp = otp;
     approvedStudent.otpExpires = Date.now() + 30 * 60 * 1000; // 30 minutes
@@ -303,6 +208,7 @@ const updateStudentProfile = async (req, res) => {
         mobile: updatedStudent.mobile,
         registrationNumber: updatedStudent.registrationNumber,
         departmentID: updatedStudent.department,
+        section: updatedStudent.section,
         cgpa: updatedStudent.cgpa,
         studentPhoto: updatedStudent.studentPhoto,
         role: "STUDENT",

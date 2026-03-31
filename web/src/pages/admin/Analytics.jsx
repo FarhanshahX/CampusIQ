@@ -61,6 +61,52 @@ const CgpaBadge = ({ cgpa }) => {
   );
 };
 
+const LabProgress = ({ scores = [] }) => {
+  const avgExp =
+    scores.length > 0
+      ? (scores.reduce((acc, sc) => acc + (sc.experimentTotal || 0), 0) /
+          (scores.length * 15)) *
+        100
+      : 0;
+  const avgAssi =
+    scores.length > 0
+      ? (scores.reduce((acc, sc) => acc + (sc.assignmentTotal || 0), 0) /
+          (scores.length * 5)) *
+        100
+      : 0;
+
+  return (
+    <div className="flex flex-col gap-2 w-32 shrink-0 py-1.5">
+      {/* Experiment Bar */}
+      <div className="space-y-0.5">
+        <div className="flex items-center justify-between text-[9px] text-gray-400 font-medium px-0.5">
+          <span>Exp</span>
+          <span>{Math.round(avgExp)}%</span>
+        </div>
+        <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden border border-gray-50">
+          <div 
+            className="h-full bg-indigo-500 transition-all duration-1000 ease-out rounded-full" 
+            style={{ width: `${Math.max(avgExp, 3)}%` }}
+          />
+        </div>
+      </div>
+      {/* Assignment Bar */}
+      <div className="space-y-0.5">
+        <div className="flex items-center justify-between text-[9px] text-gray-400 font-medium px-0.5">
+          <span>Assi</span>
+          <span>{Math.round(avgAssi)}%</span>
+        </div>
+        <div className="h-1.5 w-full bg-gray-100 rounded-full overflow-hidden border border-gray-50">
+          <div 
+            className="h-full bg-emerald-500 transition-all duration-1000 ease-out rounded-full" 
+            style={{ width: `${Math.max(avgAssi, 3)}%` }}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // ── Student Detail Modal ─────────────────────────────────────────────────────
 const StudentDetail = ({ student, onClose }) => {
   if (!student) return null;
@@ -104,41 +150,63 @@ const StudentDetail = ({ student, onClose }) => {
           </div>
           <div className="bg-gray-50 rounded-lg p-3 text-center">
             <p className="text-xs text-gray-400 uppercase tracking-wide">
+              IA
+            </p>
+            <p className="text-xl font-bold text-gray-900 mt-1">
+              {student.avgIA?.toFixed(2) || "0.00"}
+            </p>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-3 text-center">
+            <p className="text-xs text-gray-400 uppercase tracking-wide">
+              Lab
+            </p>
+            <p className="text-xl font-bold text-gray-900 mt-1">
+              {student.avgLab?.toFixed(2) || "0.00"}
+            </p>
+          </div>
+          <div className="bg-gray-50 rounded-lg p-3 text-center">
+            <p className="text-xs text-gray-400 uppercase tracking-wide">
               Total Marks
             </p>
             <p className="text-xl font-bold text-gray-900 mt-1">
-              {student.totalMarks}
+              {student.totalMarks?.toFixed(2) || "0.00"}
             </p>
           </div>
         </div>
 
         {/* CGPA Trend */}
-        {semesters.some((c) => c > 0) && (
+        {semesters.length > 0 && (
           <div>
             <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">
               CGPA Trend (Sem 1–8)
             </h3>
-            <div className="flex items-end gap-2 h-24">
+            <div className="flex items-end gap-2 h-32 bg-gray-50/50 rounded-lg p-2 border border-gray-100">
               {semesters.map((c, i) => (
                 <div
                   key={i}
-                  className="flex-1 flex flex-col items-center gap-1"
+                  className="flex-1 flex flex-col items-center justify-end h-full gap-1"
                 >
                   <div
-                    className="w-full rounded-t-md transition-all duration-300"
+                    className="w-full min-w-[18px] rounded-t-lg transition-all duration-700 ease-out shadow-sm relative group border border-white/20"
                     style={{
-                      height: `${c > 0 ? (c / 10) * 100 : 2}%`,
+                      height: `${c > 0 ? (c / 10) * 100 : 8}%`,
                       background:
                         c >= 8
-                          ? "#10B981"
+                          ? "linear-gradient(to top, #10B981, #34D399)"
                           : c >= 5
-                            ? "#F59E0B"
+                            ? "linear-gradient(to top, #F59E0B, #FBBF24)"
                             : c > 0
-                              ? "#EF4444"
-                              : "#E5E7EB",
-                      minHeight: 4,
+                              ? "linear-gradient(to top, #EF4444, #F87171)"
+                              : "#F3F4F6",
+                      minHeight: "8px",
                     }}
-                  />
+                  >
+                    {c > 0 && (
+                      <div className="absolute -top-7 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 bg-gray-900 text-white text-[10px] px-2 py-0.5 rounded-md shadow-lg transition-opacity whitespace-nowrap z-10 font-bold">
+                        {c.toFixed(2)}
+                      </div>
+                    )}
+                  </div>
                   <span className="text-[9px] text-gray-400">{i + 1}</span>
                 </div>
               ))}
@@ -168,11 +236,12 @@ const StudentDetail = ({ student, onClose }) => {
                   </div>
                   <div className="text-right">
                     <p className="text-sm font-bold text-gray-900">
-                      {sc.totalMarks}/145
+                      {sc.totalMarks?.toFixed(2)}/145
                     </p>
                     <p className="text-[10px] text-gray-400">
-                      Int:{sc.internalTotal} Exp:{sc.experimentTotal} Assi:
-                      {sc.assignmentTotal}
+                      Int:{sc.internalTotal?.toFixed(2)} Exp:
+                      {sc.experimentTotal?.toFixed(2)} Assi:
+                      {sc.assignmentTotal?.toFixed(2)}
                     </p>
                   </div>
                 </div>
@@ -239,12 +308,12 @@ const Analytics = () => {
 
     // risk filter
     if (riskFilter === "atRisk") {
-      list = list.filter((s) => s.attendanceRate < 75 || s.latestCgpa < 5);
+      list = list.filter((s) => s.attendanceRate < 50 || s.avgIA < 8);
     } else if (riskFilter === "safe") {
       list = list.filter(
         (s) =>
-          (s.attendanceRate >= 75 || s.totalSessions === 0) &&
-          (s.latestCgpa >= 5 || s.latestCgpa === 0),
+          (s.attendanceRate >= 50 || s.totalSessions === 0) &&
+          (s.avgIA >= 8 || s.avgIA === 0),
       );
     }
 
@@ -293,7 +362,7 @@ const Analytics = () => {
         <StatCard
           icon="📈"
           label="Avg CGPA"
-          value={ov.avgCgpa || "—"}
+          value={ov.avgCgpa?.toFixed(2) || "—"}
           accent="#6366F1"
         />
         <StatCard
@@ -305,8 +374,8 @@ const Analytics = () => {
         <StatCard
           icon="⚠️"
           label="At Risk"
-          value={ov.atRiskCount}
-          sub="Attendance < 75% or CGPA < 5"
+          value={data?.students?.filter(s => s.attendanceRate < 50 || s.avgIA < 8).length ?? ov.atRiskCount}
+          sub="Attendance < 50% or IA < 8"
           accent="#EF4444"
         />
       </div>
@@ -322,8 +391,8 @@ const Analytics = () => {
             onClick={() => setTab(k)}
             className={`px-4 py-2 rounded-md transition capitalize cursor-pointer ${
               tab === k
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
+                ? "bg-white text-indigo-400 shadow-sm"
+                : "text-white hover:text-gray-700"
             }`}
           >
             {label}
@@ -339,7 +408,7 @@ const Analytics = () => {
             <input
               type="text"
               placeholder="Search name or roll…"
-              className="border border-gray-200 rounded-lg px-3 py-2 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="text-black border border-gray-200 rounded-lg px-3 py-2 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-blue-500"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -409,6 +478,12 @@ const Analytics = () => {
                         Attendance
                       </th>
                       <th className="px-6 py-3 text-left font-semibold">
+                        IA
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
+                        Lab
+                      </th>
+                      <th className="px-6 py-3 text-left font-semibold">
                         Total Marks
                       </th>
                       <th className="px-6 py-3 text-left font-semibold">
@@ -419,8 +494,7 @@ const Analytics = () => {
                   <tbody className="divide-y divide-gray-50">
                     {filteredStudents.map((st) => {
                       const isAtRisk =
-                        st.attendanceRate < 75 ||
-                        (st.latestCgpa > 0 && st.latestCgpa < 5);
+                        st.attendanceRate < 50 || st.avgIA < 8;
                       return (
                         <tr
                           key={st._id}
@@ -449,8 +523,14 @@ const Analytics = () => {
                           <td className="px-6 py-3">
                             <RateBadge rate={st.attendanceRate} />
                           </td>
+                          <td className="px-6 py-3 text-gray-500 font-medium">
+                            {st.avgIA?.toFixed(2)}
+                          </td>
+                          <td className="px-6 py-3">
+                            <LabProgress scores={st.subjectScores} />
+                          </td>
                           <td className="px-6 py-3 text-gray-700 font-medium">
-                            {st.totalMarks}
+                            {st.totalMarks?.toFixed(2)}
                           </td>
                           <td className="px-6 py-3">
                             <span className="text-xs text-blue-600 hover:underline">
@@ -494,7 +574,7 @@ const Analytics = () => {
                     </div>
                     <div className="text-right">
                       <p className="text-lg font-bold text-gray-900">
-                        {sub.avgScore}
+                        {sub.avgScore?.toFixed(2)}
                       </p>
                       <p className="text-[10px] text-gray-400 uppercase">
                         Avg Score
@@ -515,19 +595,19 @@ const Analytics = () => {
                     <span>
                       High:{" "}
                       <span className="font-semibold text-emerald-600">
-                        {sub.highScore}
+                        {sub.highScore?.toFixed(2)}
                       </span>
                     </span>
                     <span>
                       Low:{" "}
                       <span className="font-semibold text-red-500">
-                        {sub.lowScore}
+                        {sub.lowScore?.toFixed(2)}
                       </span>
                     </span>
                     <span>
                       Avg:{" "}
                       <span className="font-semibold text-gray-700">
-                        {sub.avgScore}
+                        {sub.avgScore?.toFixed(2)}
                       </span>
                       /145
                     </span>

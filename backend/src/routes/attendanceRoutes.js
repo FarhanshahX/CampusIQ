@@ -8,6 +8,10 @@ const {
   getAttendanceHistory,
   getStudentAttendanceHistory,
   getStudentOverallAttendance,
+  getAttendanceScore,
+  getSessionMarkingStudents,
+  addAttendanceRecord,
+  removeAttendanceRecord,
 } = require("../controllers/attendanceController.js");
 
 const router = express.Router();
@@ -17,10 +21,14 @@ router.post("/start", startAttendanceSession); // Start a new session
 router.put("/close/:sessionId", closeAttendanceSession); // Close an active session
 router.get("/active-teacher-session", getActiveTeacherSession); // Recover active session for teacher
 router.get("/history", getAttendanceHistory); // Teacher: history + summary for a subject
+router.get("/session-marking/:sessionId", getSessionMarkingStudents); // Students marking attendance now
+router.post("/record/add", addAttendanceRecord); // Manual add
+router.delete("/record/:sessionId/:studentId", removeAttendanceRecord); // Manual remove
 
 // ── Shared ──────────────────────────────────────────────────────────────────
 router.post("/mark", markAttendance); // Student marks attendance
 router.get("/active", getActiveSessions); // Active sessions (teacher sees own, student sees theirs)
+router.get("/score/:studentId/:subjectName", getAttendanceScore); // Get computed attendance score
 
 // ── Student routes ──────────────────────────────────────────────────────────
 router.get("/student-history", getStudentAttendanceHistory); // Student: own history + summary

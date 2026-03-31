@@ -25,8 +25,27 @@ const createStudent = async (req, res) => {
   res.status(201).json(student);
 };
 
+const Admin = require("../models/Admin.js");
+
 const getStudents = async (req, res) => {
-  const students = await Student.find().populate(
+  const userId = req.query.adminID || req.query.userId;
+  let query = {};
+
+  if (userId) {
+    const Admin = require("../models/Admin.js");
+    const Teacher = require("../models/Teacher.js");
+
+    let user = await Admin.findById(userId);
+    if (!user) {
+      user = await Teacher.findById(userId);
+    }
+
+    if (user && user.department) {
+      query.department = user.department;
+    }
+  }
+
+  const students = await Student.find(query).populate(
     "department",
     "departmentName semester",
   );

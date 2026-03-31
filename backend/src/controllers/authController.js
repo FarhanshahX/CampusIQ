@@ -73,7 +73,9 @@ const StudentLogin = async (req, res) => {
       user: {
         _id: student._id,
         name: `${student.firstName} ${student.lastName}`,
+        email: student.email,
         departmentID: student.department,
+        section: student.section,
         role: "STUDENT",
       },
       token: generateToken(student._id, "STUDENT"),

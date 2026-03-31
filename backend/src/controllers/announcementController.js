@@ -1,4 +1,6 @@
 const Announcement = require("../models/Announcement.js");
+const Teacher = require("../models/Teacher.js");
+const Student = require("../models/Student.js");
 
 // @desc    Create an announcement
 // @route   POST /api/announcements
@@ -9,11 +11,22 @@ const createAnnouncement = async (req, res) => {
       req.body;
     const teacherId = userId;
 
+    let user = await Teacher.findById(userId);
+    if (!user) {
+      const Admin = require("../models/Admin.js");
+      user = await Admin.findById(userId);
+    }
+
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
     const announcementData = {
       title,
       message,
       isImportant,
-      teacher: teacherId,
+      teacher: userId,
+      department: user.department,
     };
 
     if (deadline) {
@@ -64,11 +77,14 @@ const getTeacherAnnouncements = async (req, res) => {
 // @access  Private (Student)
 const getStudentAnnouncements = async (req, res) => {
   try {
-    // For a student, fetch all announcements globally for now,
-    // or we could filter by the student's department if announcements were strictly tied to department.
-    // Given the general nature, let's pull all announcements and sort by newest.
-    // They will be populated with teacher and subject details so the student knows who sent what.
-    const announcements = await Announcement.find({})
+    const { departmentId } = req.query;
+    
+    let query = {};
+    if (departmentId) {
+      query.department = departmentId;
+    }
+
+    const announcements = await Announcement.find(query)
       .populate("subject", "subjectName")
       .populate("teacher", "firstName lastName")
       .sort({ createdAt: -1 });

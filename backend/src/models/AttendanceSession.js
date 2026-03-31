@@ -1,60 +1,3 @@
-// const mongoose = require("mongoose");
-
-// const attendanceSessionSchema = new mongoose.Schema(
-//   {
-//     subject: {
-//       type: mongoose.Schema.Types.ObjectId,
-//       ref: "Subject",
-//       required: true,
-//     },
-
-//     teacher: {
-//       type: mongoose.Schema.Types.ObjectId,
-//       ref: "Teacher",
-//       required: true,
-//     },
-
-//     department: {
-//       type: mongoose.Schema.Types.ObjectId,
-//       ref: "Department",
-//       required: true,
-//     },
-
-//     semester: Number,
-
-//     section: {
-//       type: String,
-//       enum: ["A", "B", "C", "D"],
-//     },
-
-//     sessionType: {
-//       type: String,
-//       enum: ["Lecture", "Practical", "Extra Class"],
-//       default: "Lecture",
-//     },
-
-//     lectureStart: Date,
-//     lectureEnd: Date,
-
-//     duration: Number, // minutes
-
-//     topic: String,
-
-//     bluetoothToken: {
-//       type: String,
-//       required: true,
-//     },
-
-//     status: {
-//       type: String,
-//       enum: ["active", "closed"],
-//       default: "active",
-//     },
-//   },
-//   { timestamps: true },
-// );
-
-// module.exports = mongoose.model("AttendanceSession", attendanceSessionSchema);
 
 const mongoose = require("mongoose");
 
@@ -117,7 +60,7 @@ const attendanceSessionSchema = new mongoose.Schema(
       required: true,
     },
 
-    // Bluetooth marking window in minutes (10 / 15 / 20 / 30).
+    // Marking window in minutes (10 / 15 / 20 / 30).
     duration: {
       type: Number,
       required: true,
@@ -135,10 +78,19 @@ const attendanceSessionSchema = new mongoose.Schema(
       default: 0,
     },
 
-    // Short-lived random token broadcast over Bluetooth by the teacher's device.
-    // Students must present this token when marking attendance.
-    bluetoothToken: {
+    // 4-digit numeric OTP for student manual entry.
+    otp: {
       type: String,
+      required: true,
+    },
+
+    // Teacher's location at the time of session start.
+    latitude: {
+      type: Number,
+      required: true,
+    },
+    longitude: {
+      type: Number,
       required: true,
     },
 

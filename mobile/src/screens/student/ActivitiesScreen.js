@@ -11,6 +11,7 @@ import {
   Image,
   ActivityIndicator,
   Alert,
+  RefreshControl,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import * as ImagePicker from "expo-image-picker";
@@ -78,9 +79,20 @@ const CertificateViewer = ({ uri, visible, onClose }) => (
 
 // ─── Activity Card ────────────────────────────────────────────────────────────
 
-const ActivityCard = ({ item }) => {
+const ActivityCard = ({ item, onDelete }) => {
   const [certVisible, setCertVisible] = useState(false);
   const meta = getMeta(item.type);
+
+  const confirmDelete = () => {
+    Alert.alert(
+      "Delete Activity",
+      "Are you sure you want to remove this record?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete", style: "destructive", onPress: () => onDelete(item._id) },
+      ]
+    );
+  };
 
   return (
     <View style={styles.card}>
@@ -101,6 +113,9 @@ const ActivityCard = ({ item }) => {
             <Text style={styles.certBtnText}>View Certificate →</Text>
           </TouchableOpacity>
         )}
+        <TouchableOpacity style={styles.deleteBtn} onPress={confirmDelete}>
+          <Text style={styles.deleteBtnText}>🗑️</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Title & org */}
@@ -377,6 +392,7 @@ export default function ActivitiesScreen() {
 
   const [activities, setActivities] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [sheetVisible, setSheetVisible] = useState(false);
 
   const fetchActivities = useCallback(async () => {
@@ -398,6 +414,21 @@ export default function ActivitiesScreen() {
   const handleSuccess = () => {
     setSheetVisible(false);
     fetchActivities();
+  };
+
+  const handleDelete = async (id) => {
+    try {
+      await api.delete(`/activities/${id}`);
+      fetchActivities();
+    } catch (err) {
+      Alert.alert("Error", "Could not delete activity.");
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchActivities();
+    setRefreshing(false);
   };
 
   return (
@@ -431,9 +462,13 @@ export default function ActivitiesScreen() {
         <FlatList
           data={activities}
           keyExtractor={(item) => item._id}
-          renderItem={({ item }) => <ActivityCard item={item} />}
+          renderItem={({ item }) => (
+            <ActivityCard item={item} onDelete={handleDelete} />
+          )}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          onRefresh={onRefresh}
+          refreshing={refreshing}
           ListEmptyComponent={
             <View style={styles.emptyState}>
               <Text style={styles.emptyIcon}>🎖️</Text>
@@ -466,7 +501,7 @@ export default function ActivitiesScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#F7F8FA" },
+  screen: { color: "#000", flex: 1, backgroundColor: "#F7F8FA" },
 
   // Header
   header: {
@@ -593,6 +628,15 @@ const styles = StyleSheet.create({
     color: "#9CA3AF",
     lineHeight: 18,
     marginBottom: 10,
+  },
+  deleteBtn: {
+    padding: 6,
+    borderRadius: 8,
+    backgroundColor: "#FEF2F2",
+    marginLeft: 10,
+  },
+  deleteBtnText: {
+    fontSize: 14,
   },
 
   // Certificate thumbnail

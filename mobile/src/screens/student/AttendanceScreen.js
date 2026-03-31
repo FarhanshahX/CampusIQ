@@ -9,11 +9,13 @@ import {
   Alert,
   ActivityIndicator,
   Animated,
+  RefreshControl,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { useAuth } from "../../context/AuthContext";
 import api from "../../api/axios";
-import { startContinuousScan } from "../../utils/BLEManager";
+import * as Location from "expo-location";
+import { TextInput } from "react-native";
 
 // ─────────────────────────────────────────────
 // PALETTE
@@ -119,13 +121,7 @@ const StatTile = ({ label, value, accent }) => (
 // ─────────────────────────────────────────────
 // MARK ATTENDANCE CARD
 // ─────────────────────────────────────────────
-const MarkAttendanceCard = ({
-  session,
-  isInRange,
-  scanning,
-  onMark,
-  marking,
-}) => {
+const MarkAttendanceCard = ({ session, onMark, marking, otp, setOtp }) => {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
@@ -157,13 +153,7 @@ const MarkAttendanceCard = ({
   const isPractical = session.sessionType === "Practical";
 
   return (
-    <Animated.View
-      style={[
-        s.markCard,
-        { opacity: fadeAnim },
-        !isInRange && !scanning && s.markCardDisabled,
-      ]}
-    >
+    <Animated.View style={[s.markCard, { opacity: fadeAnim }]}>
       {/* Header */}
       <View style={s.markCardHeader}>
         <View style={s.liveChip}>
@@ -209,41 +199,33 @@ const MarkAttendanceCard = ({
 
       <Divider />
 
-      {/* BLE scanning status */}
-      {scanning && (
-        <View style={s.scanningBox}>
-          <ActivityIndicator size="small" color={C.accent} />
-          <Text style={s.scanningText}>Scanning for teacher's device…</Text>
-        </View>
-      )}
+      {/* OTP Input */}
+      <View style={s.otpSection}>
+        <Text style={s.otpLabel}>Enter JOINING CODE (OTP)</Text>
+        <TextInput
+          style={s.otpInput}
+          value={otp}
+          onChangeText={setOtp}
+          placeholder="4-digit code"
+          keyboardType="number-pad"
+          maxLength={4}
+          placeholderTextColor={C.muted}
+        />
+      </View>
 
       {/* CTA */}
-      {!scanning &&
-        (isInRange ? (
-          <TouchableOpacity
-            style={[s.markBtn, marking && s.markBtnLoading]}
-            onPress={onMark}
-            disabled={marking}
-            activeOpacity={0.85}
-          >
-            {marking ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text style={s.markBtnText}>✓ Mark Present</Text>
-            )}
-          </TouchableOpacity>
+      <TouchableOpacity
+        style={[s.markBtn, (marking || otp.length < 4) && s.markBtnDisabled]}
+        onPress={onMark}
+        disabled={marking || otp.length < 4}
+        activeOpacity={0.85}
+      >
+        {marking ? (
+          <ActivityIndicator color="#fff" />
         ) : (
-          <View style={s.outOfRangeBox}>
-            <Text style={s.outOfRangeIcon}>📡</Text>
-            <View style={{ flex: 1 }}>
-              <Text style={s.outOfRangeTitle}>Out of Bluetooth Range</Text>
-              <Text style={s.outOfRangeSub}>
-                Move closer to the classroom. The app will re-check every 15
-                seconds.
-              </Text>
-            </View>
-          </View>
-        ))}
+          <Text style={s.markBtnText}>✓ Mark Present</Text>
+        )}
+      </TouchableOpacity>
     </Animated.View>
   );
 };
@@ -256,14 +238,10 @@ export default function StudentAttendanceScreen() {
 
   // ── Active session ────────────────────────
   const [activeSession, setActiveSession] = useState(null);
-  const [isInRange, setIsInRange] = useState(false);
-  const [scanning, setScanning] = useState(false); // true during first BLE scan
   const [marking, setMarking] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [alreadyMarked, setAlreadyMarked] = useState(false);
-
-  // Ref to hold the BLE scan cleanup function so we can cancel it on unmount
-  // or when the session disappears.
-  const stopScanRef = useRef(null);
+  const [otpInput, setOtpInput] = useState("");
 
   // ── Subjects & filters ────────────────────
   const [subjects, setSubjects] = useState([]);
@@ -303,48 +281,12 @@ export default function StudentAttendanceScreen() {
     }
   }, [history]);
 
-  // Stop BLE scanning on unmount
+  // Stop location tracking on unmount (if any)
   useEffect(() => {
     return () => {
-      if (stopScanRef.current) stopScanRef.current();
+      // cleanup
     };
   }, []);
-
-  // ─────────────────────────────────────────
-  // BLE SCANNING
-  // ─────────────────────────────────────────
-  /**
-   * Called once we know which session is active.
-   * Kicks off a continuous BLE scan that updates `isInRange` every ~15 s.
-   */
-  const startBLEScan = (bluetoothToken) => {
-    // Cancel any previous scan
-    if (stopScanRef.current) stopScanRef.current();
-
-    setScanning(true);
-    setIsInRange(false);
-
-    // startContinuousScan fires the first scan immediately, then repeats.
-    // We wrap setIsInRange so we can also clear the `scanning` spinner after
-    // the very first result comes back.
-    let firstResult = true;
-    const wrappedSetter = (inRange) => {
-      if (firstResult) {
-        firstResult = false;
-        setScanning(false);
-      }
-      setIsInRange(inRange);
-    };
-
-    const cleanup = startContinuousScan(
-      bluetoothToken,
-      wrappedSetter,
-      15000, // re-scan every 15 s
-      8000, // each scan times out after 8 s
-    );
-
-    stopScanRef.current = cleanup;
-  };
 
   // ─────────────────────────────────────────
   // API CALLS
@@ -367,26 +309,22 @@ export default function StudentAttendanceScreen() {
    */
   const checkActiveSession = async () => {
     try {
-      const res = await api.get("/attendance/active");
+      const params = new URLSearchParams({
+        departmentId: user.departmentID || "",
+        section: user.section || "",
+      });
+      const res = await api.get(`/attendance/active?${params.toString()}`);
       const sessions = res.data;
 
       if (!sessions || sessions.length === 0) {
         setActiveSession(null);
-        setIsInRange(false);
-        if (stopScanRef.current) {
-          stopScanRef.current();
-          stopScanRef.current = null;
-        }
         return;
       }
 
-      // Filter by student's section for Practical sessions
-      const relevant = sessions.find((sess) => {
-        if (sess.sessionType === "Practical") {
-          return sess.section === user.section;
-        }
-        return true;
-      });
+      // Backend now filters by department and section (for practicals).
+      // If multiple sessions are still returned (e.g. overlapping Lecture/Practical), 
+      // we take the first one or prioritize Practical.
+      const relevant = sessions.find(s => s.sessionType === "Practical") || sessions[0];
 
       setActiveSession(relevant || null);
 
@@ -402,16 +340,9 @@ export default function StudentAttendanceScreen() {
           setAlreadyMarked(true);
         } else {
           setAlreadyMarked(false);
-          // ── Start real BLE scan for the session token ───────────────────
-          startBLEScan(relevant.bluetoothToken);
         }
       } else {
         setAlreadyMarked(false);
-        setIsInRange(false);
-        if (stopScanRef.current) {
-          stopScanRef.current();
-          stopScanRef.current = null;
-        }
       }
     } catch (e) {
       console.log("checkActiveSession:", e);
@@ -419,22 +350,33 @@ export default function StudentAttendanceScreen() {
   };
 
   const handleMarkAttendance = async () => {
-    if (!activeSession || !isInRange) return;
+    if (!activeSession || otpInput.length < 4) return;
     setMarking(true);
     try {
+      // ── Step 1: Get Current Location ──────────────────────────────────────
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission Denied",
+          "Location permission is required to mark attendance.",
+        );
+        setMarking(false);
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+
       await api.post("/attendance/mark", {
         sessionId: activeSession._id,
         studentId: user._id,
-        bluetoothToken: activeSession.bluetoothToken,
-        deviceId: user.deviceId, // hashed device fingerprint from app init
+        otp: otpInput,
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
+        deviceId: user.deviceId,
         user: user,
       });
-
-      // Stop BLE scan — no longer needed after marking
-      if (stopScanRef.current) {
-        stopScanRef.current();
-        stopScanRef.current = null;
-      }
 
       setAlreadyMarked(true);
       Alert.alert(
@@ -448,6 +390,16 @@ export default function StudentAttendanceScreen() {
     } finally {
       setMarking(false);
     }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([
+      fetchSubjects(),
+      checkActiveSession(),
+      fetchHistory(),
+    ]);
+    setRefreshing(false);
   };
 
   const fetchHistory = useCallback(async () => {
@@ -501,7 +453,13 @@ export default function StudentAttendanceScreen() {
   // RENDER
   // ─────────────────────────────────────────
   return (
-    <ScrollView style={s.screen} contentContainerStyle={{ paddingBottom: 40 }}>
+    <ScrollView
+      style={s.screen}
+      contentContainerStyle={{ paddingBottom: 40 }}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+    >
       {/* PAGE HEADER */}
       <View style={s.pageHeader}>
         <View>
@@ -516,10 +474,10 @@ export default function StudentAttendanceScreen() {
       {activeSession && !alreadyMarked && (
         <MarkAttendanceCard
           session={activeSession}
-          isInRange={isInRange}
-          scanning={scanning}
           onMark={handleMarkAttendance}
           marking={marking}
+          otp={otpInput}
+          setOtp={setOtpInput}
         />
       )}
 
@@ -664,6 +622,7 @@ export default function StudentAttendanceScreen() {
 // ─────────────────────────────────────────────
 const s = StyleSheet.create({
   screen: {
+    color: "#000",
     flex: 1,
     backgroundColor: C.bg,
     paddingHorizontal: 16,
@@ -770,18 +729,30 @@ const s = StyleSheet.create({
     marginBottom: 4,
   },
 
-  // Scanning spinner row
-  scanningBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 12,
-    justifyContent: "center",
+  // OTP Section
+  otpSection: {
+    marginVertical: 15,
   },
-  scanningText: {
-    fontSize: 13,
-    color: C.accent,
-    fontWeight: "600",
+  otpLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: C.primary,
+    marginBottom: 8,
+    textAlign: "center",
+    letterSpacing: 0.5,
+  },
+  otpInput: {
+    backgroundColor: "#F8FAFC",
+    borderWidth: 2,
+    borderColor: C.border,
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    fontSize: 24,
+    fontWeight: "800",
+    color: C.primary,
+    textAlign: "center",
+    letterSpacing: 8,
   },
 
   markBtn: {
@@ -791,7 +762,9 @@ const s = StyleSheet.create({
     alignItems: "center",
     marginTop: 4,
   },
-  markBtnLoading: { opacity: 0.7 },
+  markBtnDisabled: {
+    backgroundColor: C.disabled,
+  },
   markBtnText: {
     color: "#FFF",
     fontWeight: "700",

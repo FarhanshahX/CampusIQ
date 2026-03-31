@@ -9,6 +9,7 @@ import {
   ActivityIndicator,
   Dimensions,
   Modal,
+  RefreshControl,
 } from "react-native";
 import api from "../../api/axios";
 import { useAuth } from "../../context/AuthContext";
@@ -57,6 +58,7 @@ export default function AnalyticsScreen() {
   const [riskFilter, setRiskFilter] = useState("all"); // all | atRisk
   const [sortBy, setSortBy] = useState("rollNumber"); // rollNumber | cgpa | ia | attendance
   const [selectedStudent, setSelectedStudent] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     if (activeSubject) {
@@ -76,6 +78,12 @@ export default function AnalyticsScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchAnalytics();
+    setRefreshing(false);
   };
 
   const filteredStudents = useMemo(() => {
@@ -138,6 +146,9 @@ export default function AnalyticsScreen() {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
         {/* Header */}
         <View style={styles.headerSection}>
@@ -475,7 +486,7 @@ export default function AnalyticsScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8FAFC" },
+  container: { color: "#000", flex: 1, backgroundColor: "#F8FAFC" },
   flexCenter: { flex: 1, backgroundColor: "#F8FAFC" },
   scrollContent: { padding: 20 },
 

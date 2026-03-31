@@ -98,6 +98,24 @@ export const AuthProvider = ({ children }) => {
     if (data.token) {
       await AsyncStorage.setItem("token", data.token);
     }
+
+    // Auto-select the first subject if teacher
+    if (finalUser.role === "teacher" && finalUser._id) {
+      try {
+        const res = await axios.get(
+          `${API_BASE_URL}/api/subjects/teacher/${finalUser._id}`,
+          { headers: { Authorization: `Bearer ${data.token}` } }
+        );
+        const subjects = res.data;
+        if (subjects && subjects.length > 0) {
+          const first = subjects[0];
+          setActiveSubject(first);
+          await AsyncStorage.setItem("activeSubject", JSON.stringify(first));
+        }
+      } catch (err) {
+        console.log("Auto-select subject failed on login:", err.message);
+      }
+    }
   };
 
   const logout = async () => {

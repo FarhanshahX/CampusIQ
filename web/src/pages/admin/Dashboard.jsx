@@ -81,30 +81,36 @@ const Donut = ({ pct, size = 100, stroke = 10, color = "#3B5BDB", label }) => {
 
 // ── Vertical bar chart (pure CSS) ────────────────────────────────────────────
 const BarChart = ({ items, maxVal, labelKey, valueKey, colorFn }) => {
-  const mx = maxVal || Math.max(...items.map((i) => i[valueKey]), 1);
+  const values = items.map((i) => i[valueKey] || 0);
+  const mx = maxVal || Math.max(...values, 1);
   return (
-    <div className="flex items-end gap-2 h-32">
-      {items.map((item, i) => (
-        <div
-          key={i}
-          className="flex-1 flex flex-col items-center gap-1 min-w-0"
-        >
-          <span className="text-[10px] font-bold text-gray-600">
-            {item[valueKey]}
-          </span>
+    <div className="flex items-end gap-2 h-32 px-1">
+      {items.map((item, i) => {
+        const val = item[valueKey] || 0;
+        const pct = (val / mx) * 100;
+        return (
           <div
-            className="w-full rounded-t-md transition-all duration-500"
-            style={{
-              height: `${Math.max((item[valueKey] / mx) * 100, 4)}%`,
-              background: colorFn ? colorFn(item) : "#3B5BDB",
-              minHeight: 4,
-            }}
-          />
-          <span className="text-[9px] text-gray-400 truncate w-full text-center">
-            {item[labelKey]}
-          </span>
-        </div>
-      ))}
+            key={i}
+            className="flex-1 flex flex-col items-center gap-1 min-w-0 group h-full justify-end"
+          >
+            <span className="text-[9px] font-bold text-gray-600 opacity-0 group-hover:opacity-100 transition-opacity">
+              {val}
+            </span>
+            <div
+              className="w-full rounded-t-lg transition-all duration-500 ease-out"
+              style={{
+                height: `${Math.max(pct, 6)}%`,
+                background: colorFn ? colorFn(item) : "#3B5BDB",
+                minHeight: "6%",
+              }}
+              title={`${item[labelKey]}: ${val}`}
+            />
+            <span className="text-[9px] text-gray-400 truncate w-full text-center mt-1">
+              {item[labelKey]}
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 };
@@ -162,27 +168,37 @@ const Dashboard = () => {
   }));
 
   // ── Attendance Distribution buckets ──
-  const attBuckets = { "≥90%": 0, "75–90%": 0, "50–75%": 0, "<50%": 0 };
+  const attBuckets = { "≥75%": 0, "50–75%": 0, "20–50%": 0, "<20%": 0 };
   (att?.studentBreakdown || []).forEach((st) => {
     const r = st.rate;
-    if (r >= 90) attBuckets["≥90%"]++;
-    else if (r >= 75) attBuckets["75–90%"]++;
+    if (r >= 75) attBuckets["≥75%"]++;
     else if (r >= 50) attBuckets["50–75%"]++;
-    else attBuckets["<50%"]++;
+    else if (r >= 20) attBuckets["20–50%"]++;
+    else attBuckets["<20%"]++;
   });
   const attItems = Object.entries(attBuckets).map(([label, count]) => ({
     label,
     count,
   }));
 
-  // ── At-risk students (sorted by attendance asc) ──
-  const atRisk = (analytics?.students || [])
-    .filter(
-      (st) =>
-        st.attendanceRate < 75 || (st.latestCgpa > 0 && st.latestCgpa < 5),
-    )
+  // ── At-risk students (Attendance < 50% or IA < 8) ──
+  const atRiskInfo = (analytics?.students || []).map((st) => {
+    const avgIA =
+      st.subjectScores.length > 0
+        ? st.subjectScores.reduce((acc, sc) => acc + sc.internalTotal, 0) /
+          st.subjectScores.length
+        : 0;
+    const isIAAtRisk = st.subjectScores.some((sc) => sc.internalTotal < 8);
+    const isAttAtRisk = st.attendanceRate < 50;
+    return { ...st, avgIA, atRisk: isIAAtRisk || isAttAtRisk };
+  });
+
+  const atRisk = atRiskInfo
+    .filter((st) => st.atRisk)
     .sort((a, b) => a.attendanceRate - b.attendanceRate)
     .slice(0, 8);
+
+  const atRiskCount = atRiskInfo.filter((st) => st.atRisk).length;
 
   // ── Subject attendance for bar chart ──
   const subjectAtt = (att?.subjectBreakdown || []).slice(0, 8);
@@ -241,8 +257,8 @@ const Dashboard = () => {
         <StatCard
           icon="⚠️"
           label="At Risk"
-          value={ov.atRiskCount ?? 0}
-          sub="Att < 75% or CGPA < 5"
+          value={atRiskCount}
+          sub="Att < 50% or IA < 8"
           accent="#EF4444"
         />
         <StatCard
@@ -314,9 +330,9 @@ const Dashboard = () => {
             valueKey="count"
             colorFn={(item) => {
               const l = item.label;
-              if (l === "≥90%") return "#10B981";
-              if (l === "75–90%") return "#6366F1";
-              if (l === "50–75%") return "#F59E0B";
+              if (l === "≥75%") return "#10B981";
+              if (l === "50–75%") return "#6366F1";
+              if (l === "20–50%") return "#F59E0B";
               return "#EF4444";
             }}
           />
@@ -361,7 +377,7 @@ const Dashboard = () => {
               ⚠️ At-Risk Students
             </p>
             <p className="text-[10px] text-gray-400 mt-0.5">
-              Attendance &lt; 75% or CGPA &lt; 5
+              Attendance &lt; 50% or IA &lt; 8
             </p>
           </div>
           {atRisk.length > 0 ? (
@@ -371,7 +387,7 @@ const Dashboard = () => {
                   <tr className="bg-gray-50 text-gray-400 uppercase tracking-wide">
                     <th className="px-5 py-2 text-left font-semibold">Name</th>
                     <th className="px-5 py-2 text-left font-semibold">Roll</th>
-                    <th className="px-5 py-2 text-left font-semibold">CGPA</th>
+                    <th className="px-5 py-2 text-left font-semibold">IA (Avg)</th>
                     <th className="px-5 py-2 text-left font-semibold">Att %</th>
                   </tr>
                 </thead>
@@ -386,9 +402,9 @@ const Dashboard = () => {
                       </td>
                       <td className="px-5 py-2.5">
                         <span
-                          className={`font-bold ${st.latestCgpa > 0 && st.latestCgpa < 5 ? "text-red-500" : "text-gray-700"}`}
+                          className={`font-bold ${st.avgIA < 8 ? "text-red-500" : "text-gray-700"}`}
                         >
-                          {st.latestCgpa > 0 ? st.latestCgpa.toFixed(1) : "—"}
+                          {st.avgIA.toFixed(1)}
                         </span>
                       </td>
                       <td className="px-5 py-2.5">
@@ -417,41 +433,61 @@ const Dashboard = () => {
         {/* Subject score overview */}
         <Card className="p-5 space-y-4">
           <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-            Subject Score Overview (out of 145)
+            Subject Score Overview (IA out of 20)
           </p>
           {(analytics?.subjects || []).length > 0 ? (
             <div className="space-y-3">
-              {analytics.subjects.map((sub, i) => (
-                <div
-                  key={i}
-                  className="flex items-center justify-between gap-3"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-medium text-gray-800 truncate">
-                      {sub.subjectName}
-                    </p>
-                    <HBar
-                      pct={(sub.avgScore / 145) * 100}
-                      color={
-                        sub.avgScore >= 100
-                          ? "#10B981"
-                          : sub.avgScore >= 70
-                            ? "#F59E0B"
-                            : "#EF4444"
-                      }
-                      h="h-1.5"
-                    />
+              {analytics.subjects.map((sub, i) => {
+                // Determine IA average from student data for this subject
+                const subjectId = sub.subjectCode; // or find by id if available
+                const studentIAs = (analytics?.students || []).flatMap((st) =>
+                  st.subjectScores
+                    .filter(
+                      (sc) =>
+                        sc.subjectName === sub.subjectName ||
+                        sc.subjectCode === sub.subjectCode,
+                    )
+                    .map((sc) => sc.internalTotal),
+                );
+                const avgIA =
+                  studentIAs.length > 0
+                    ? studentIAs.reduce((a, b) => a + b, 0) / studentIAs.length
+                    : 0;
+
+                return (
+                  <div
+                    key={i}
+                    className="flex items-center justify-between gap-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-medium text-gray-800 truncate">
+                        {sub.subjectName}
+                      </p>
+                      <HBar
+                        pct={(avgIA / 20) * 100}
+                        color={
+                          avgIA >= 17
+                            ? "#10B981"
+                            : avgIA >= 12
+                              ? "#6366F1"
+                              : avgIA >= 8
+                                ? "#F59E0B"
+                                : "#EF4444"
+                        }
+                        h="h-1.5"
+                      />
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-xs font-bold text-gray-900">
+                        {avgIA.toFixed(1)}
+                      </p>
+                      <div className="flex gap-1 justify-end text-[8px] font-bold uppercase tracking-tighter text-gray-400">
+                        <span>IA AVG</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-xs font-bold text-gray-900">
-                      {sub.avgScore}
-                    </p>
-                    <p className="text-[9px] text-gray-400">
-                      H:{sub.highScore} L:{sub.lowScore}
-                    </p>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <p className="text-sm text-gray-400">No scores yet.</p>

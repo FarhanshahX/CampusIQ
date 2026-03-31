@@ -90,20 +90,22 @@ const BarChart = ({ items, maxVal, labelKey, valueKey, colorFn }) => {
       {items.map((item, i) => (
         <div
           key={i}
-          className="flex-1 flex flex-col items-center gap-2 min-w-0 group"
+          className="flex-1 flex flex-col items-center min-w-0 group h-full"
         >
-          <span className="text-[10px] font-black text-gray-900 opacity-0 group-hover:opacity-100 transition-opacity">
-            {item[valueKey] || 0}
-          </span>
-          <div
-            className="w-full rounded-t-xl transition-all duration-700 ease-out cursor-help"
-            style={{
-              height: `${Math.max(((item[valueKey] || 0) / mx) * 100, 8)}%`,
-              backgroundColor: colorFn ? colorFn(item) : "#6366F1",
-            }}
-            title={`${item[labelKey]}: ${item[valueKey] || 0}`}
-          />
-          <span className="text-[8px] font-black text-gray-400 uppercase tracking-tighter truncate w-full text-center">
+          <div className="flex-1 w-full flex flex-col items-center justify-end gap-1">
+            <span className="text-[10px] font-black text-gray-900 opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+              {item[valueKey] || 0}
+            </span>
+            <div
+              className="w-full rounded-t-xl transition-all duration-700 ease-out cursor-help"
+              style={{
+                height: `${Math.max(((item[valueKey] || 0) / mx) * 100, 8)}%`,
+                backgroundColor: colorFn ? colorFn(item) : "#6366F1",
+              }}
+              title={`${item[labelKey]}: ${item[valueKey] || 0}`}
+            />
+          </div>
+          <span className="text-[8px] font-black text-gray-400 uppercase tracking-tighter truncate w-full text-center mt-2">
             {item[labelKey]}
           </span>
         </div>
@@ -153,13 +155,13 @@ const TeacherDashboard = () => {
   }, [data]);
 
   const attBuckets = useMemo(() => {
-    const b = { "≥90%": 0, "75–90%": 0, "40–75%": 0, "<40%": 0 };
+    const b = { "≥75%": 0, "50–75%": 0, "20–50%": 0, "<20%": 0 };
     (data?.students || []).forEach((s) => {
       const r = s.attendanceRate || 0;
-      if (r >= 90) b["≥90%"]++;
-      else if (r >= 75) b["75–90%"]++;
-      else if (r >= 40) b["40–75%"]++;
-      else b["<40%"]++;
+      if (r >= 75) b["≥75%"]++;
+      else if (r >= 50) b["50–75%"]++;
+      else if (r >= 20) b["20–50%"]++;
+      else b["<20%"]++;
     });
     return Object.entries(b).map(([label, count]) => ({ label, count }));
   }, [data]);
@@ -335,9 +337,9 @@ const TeacherDashboard = () => {
             labelKey="label"
             valueKey="count"
             colorFn={(item) => {
-              if (item.label === "≥90%") return "#10B981";
-              if (item.label === "75–90%") return "#6366F1";
-              if (item.label === "40–75%") return "#F59E0B";
+              if (item.label === "≥75%") return "#10B981";
+              if (item.label === "50–75%") return "#6366F1";
+              if (item.label === "20–50%") return "#F59E0B";
               return "#EF4444";
             }}
           />

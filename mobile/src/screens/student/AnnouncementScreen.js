@@ -6,8 +6,10 @@ import {
   ScrollView,
   FlatList,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import api from "../../api/axios";
+import { useAuth } from "../../context/AuthContext";
 
 // ─────────────────────────────────────────────
 // PALETTE
@@ -26,8 +28,10 @@ const C = {
 };
 
 export default function MessagesScreen() {
+  const { user } = useAuth();
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   // ─────────────────────────────────────────────
   // INIT
@@ -39,7 +43,9 @@ export default function MessagesScreen() {
   const fetchAnnouncements = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.get("/announcements/student");
+      const res = await api.get(
+        `/announcements/student?departmentId=${user.departmentID}`,
+      );
       setAnnouncements(res.data || []);
     } catch (e) {
       console.log("Error fetching announcements", e);
@@ -48,36 +54,57 @@ export default function MessagesScreen() {
     }
   }, []);
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchAnnouncements();
+    setRefreshing(false);
+  };
+
   // ─────────────────────────────────────────────
   // RENDER HELPERS
   // ─────────────────────────────────────────────
   const renderItem = ({ item }) => {
     const dDate = new Date(item.createdAt);
-    const dateStr = dDate.toLocaleDateString("en-GB", { day: '2-digit', month: 'short', year: 'numeric' });
-    const timeStr = dDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const dateStr = dDate.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+    const timeStr = dDate.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+    });
 
     let deadlineStr = null;
     if (item.deadline) {
       const dline = new Date(item.deadline);
-      deadlineStr = dline.toLocaleDateString("en-GB", { day: '2-digit', month: 'short', year: 'numeric' });
+      deadlineStr = dline.toLocaleDateString("en-GB", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
     }
 
-    const teacherName = item.teacher ? `${item.teacher.firstName} ${item.teacher.lastName}` : "Unknown Teacher";
+    const teacherName = item.teacher
+      ? `${item.teacher.firstName} ${item.teacher.lastName}`
+      : "Unknown Teacher";
 
     return (
       <View style={[s.card, item.isImportant && s.cardImportant]}>
         <View style={s.cardHeader}>
-          <Text style={s.cardTitle} numberOfLines={1}>{item.title}</Text>
-          {item.isImportant && (
-            <Text style={s.importantBadge}>Important</Text>
-          )}
+          <Text style={s.cardTitle} numberOfLines={1}>
+            {item.title}
+          </Text>
+          {item.isImportant && <Text style={s.importantBadge}>Important</Text>}
         </View>
 
         <Text style={s.cardMeta}>
           {dateStr} at {timeStr}
-          {item.subject ? ` · ${item.subject.subjectName}` : ` · General Subject`}
+          {item.subject
+            ? ` · ${item.subject.subjectName}`
+            : ` · General Subject`}
         </Text>
-        
+
         <Text style={s.cardTeacher}>Posted by {teacherName}</Text>
 
         <View style={s.divider} />
@@ -98,12 +125,18 @@ export default function MessagesScreen() {
       {/* PAGE HEADER */}
       <View style={s.pageHeader}>
         <Text style={s.pageTitle}>Announcements</Text>
-        <Text style={s.pageSub}>Important updates and messages from teachers</Text>
+        <Text style={s.pageSub}>
+          Important updates and messages from teachers
+        </Text>
       </View>
 
       {/* LIST */}
       {loading ? (
-        <ActivityIndicator size="large" color={C.primary} style={{ marginTop: 40 }} />
+        <ActivityIndicator
+          size="large"
+          color={C.primary}
+          style={{ marginTop: 40 }}
+        />
       ) : announcements.length === 0 ? (
         <View style={s.emptyState}>
           <Text style={s.emptyStateTitle}>You're all caught up!</Text>
@@ -116,6 +149,8 @@ export default function MessagesScreen() {
           renderItem={renderItem}
           contentContainerStyle={{ paddingBottom: 40 }}
           showsVerticalScrollIndicator={false}
+          onRefresh={onRefresh}
+          refreshing={refreshing}
         />
       )}
     </View>
@@ -127,12 +162,13 @@ export default function MessagesScreen() {
 // ─────────────────────────────────────────────
 const s = StyleSheet.create({
   container: {
+    color: "#000",
     flex: 1,
     backgroundColor: C.bg,
     paddingHorizontal: 16,
   },
   pageHeader: {
-    paddingTop: 40,
+    paddingTop: 20,
     paddingBottom: 20,
   },
   pageTitle: {
@@ -160,7 +196,7 @@ const s = StyleSheet.create({
     fontSize: 14,
     color: C.muted,
   },
-  
+
   // Card Styles
   card: {
     backgroundColor: C.surface,

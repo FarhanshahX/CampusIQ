@@ -769,7 +769,9 @@ const ScoresEntering = () => {
   const fetchStudents = async () => {
     try {
       setLoading(true);
-      const res = await api.get("/admin/students");
+      const res = await api.get("/admin/students", {
+        params: { userId: user._id },
+      });
       setStudents(res.data);
     } catch (e) {
       console.error(e);

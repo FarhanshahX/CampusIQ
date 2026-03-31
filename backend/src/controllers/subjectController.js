@@ -34,7 +34,6 @@ const createSubject = async (req, res) => {
 
 const getSubjects = async (req, res) => {
   const { deptID } = req.params;
-  console.log("Fetching subjects for department ID:", deptID);
   try {
     const subjects = await Subject.find({
       department: deptID,

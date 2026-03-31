@@ -41,9 +41,7 @@ const RateBadge = ({ rate }) => {
         ? "text-amber-700 bg-amber-50 border-amber-200"
         : "text-red-700 bg-red-50 border-red-200";
   return (
-    <span
-      className={`text-xs font-bold px-2 py-0.5 rounded border ${color}`}
-    >
+    <span className={`text-xs font-bold px-2 py-0.5 rounded border ${color}`}>
       {rate}%
     </span>
   );
@@ -59,9 +57,7 @@ const Attendance = () => {
   useEffect(() => {
     (async () => {
       try {
-        const res = await api.get(
-          `/admin/attendance-overview/${adminId()}`,
-        );
+        const res = await api.get(`/admin/attendance-overview/${adminId()}`);
         setData(res.data);
       } catch (e) {
         console.error(e);
@@ -103,11 +99,7 @@ const Attendance = () => {
 
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <StatCard
-          icon="📋"
-          label="Total Sessions"
-          value={s.totalSessions}
-        />
+        <StatCard icon="📋" label="Total Sessions" value={s.totalSessions} />
         <StatCard
           icon="✅"
           label="Total Present"
@@ -140,8 +132,8 @@ const Attendance = () => {
             onClick={() => setTab(k)}
             className={`px-4 py-2 rounded-md transition capitalize cursor-pointer ${
               tab === k
-                ? "bg-white text-gray-900 shadow-sm"
-                : "text-gray-500 hover:text-gray-700"
+                ? "bg-amber text-indigo-400 shadow-sm"
+                : "text-white hover:text-gray-700"
             }`}
           >
             {label}
@@ -212,7 +204,7 @@ const Attendance = () => {
           <input
             type="text"
             placeholder="Search by name or roll number…"
-            className="w-full sm:w-80 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="text-black w-full sm:w-80 border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -244,10 +236,7 @@ const Attendance = () => {
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {filteredStudents.map((st) => (
-                      <tr
-                        key={st._id}
-                        className="hover:bg-gray-50 transition"
-                      >
+                      <tr key={st._id} className="hover:bg-gray-50 transition">
                         <td className="px-6 py-3 font-medium text-gray-900">
                           {st.name}
                         </td>

@@ -121,6 +121,8 @@ const Attendance = () => {
   const [sessionId, setSessionId] = useState(null);
   const [sessionActive, setSessionActive] = useState(false);
   const [timer, setTimer] = useState(0);
+  const [otp, setOtp] = useState("");
+  const [locationLoading, setLocationLoading] = useState(false);
 
   // ── History / filters ─────────────────────
   const [filters, setFilters] = useState({
@@ -137,6 +139,10 @@ const Attendance = () => {
   });
   const [students, setStudents] = useState([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+  const [sessions, setSessions] = useState([]);
+  const [ongoingStudents, setOngoingStudents] = useState([]);
+  const [showManualAdd, setShowManualAdd] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
 
   // ── Initialization ────────────────────────
   useEffect(() => {
@@ -151,6 +157,7 @@ const Attendance = () => {
       if (sess) {
         setSessionId(sess._id);
         setSessionActive(true);
+        setOtp(sess.otp || "");
         
         // Calculate remaining time
         const createdAt = new Date(sess.createdAt).getTime();
@@ -176,9 +183,22 @@ const Attendance = () => {
   // ── Timer Logic ───────────────────────────
   useEffect(() => {
     if (!sessionActive || timer <= 0) return;
-    const id = setInterval(() => setTimer((p) => p - 1), 1000);
+    const id = setInterval(() => {
+      setTimer((p) => p - 1);
+      fetchOngoingStudents();
+    }, 5000);
     return () => clearInterval(id);
-  }, [sessionActive, timer]);
+  }, [sessionActive, timer, sessionId]);
+
+  const fetchOngoingStudents = async () => {
+    if (!sessionId) return;
+    try {
+      const res = await api.get(`/attendance/session-marking/${sessionId}`);
+      setOngoingStudents(res.data || []);
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   // Auto-close when timer hits 0
   useEffect(() => {
@@ -196,9 +216,37 @@ const Attendance = () => {
     e.preventDefault();
     if (!activeSubject) return;
 
+    setLocationLoading(true);
+
+    // Helper to get geolocation as a promise
+    const getPosition = () =>
+      new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+          enableHighAccuracy: true,
+          timeout: 5000,
+          maximumAge: 0,
+        });
+      });
+
     try {
+      let coords = { latitude: 0, longitude: 0 };
+      try {
+        const pos = await getPosition();
+        coords = {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+        };
+      } catch (geoErr) {
+        console.warn("Geolocation error:", geoErr);
+        alert("Location is required to start a session. Please enable GPS.");
+        setLocationLoading(false);
+        return;
+      }
+
       // ── Step 1: Get total count of enrolled students ──────────────────────
-      const historyRes = await api.get(`/attendance/history?subjectId=${activeSubject._id}`);
+      const historyRes = await api.get(
+        `/attendance/history?subjectId=${activeSubject._id}`,
+      );
       const enrolledCount = historyRes.data.students?.length || 0;
 
       const [startTime, endTime] = sessionForm.period.split("-");
@@ -213,19 +261,24 @@ const Attendance = () => {
         duration: sessionForm.duration,
         topic: sessionForm.topic,
         totalStudents: enrolledCount,
+        latitude: coords.latitude,
+        longitude: coords.longitude,
         user: user._id,
       });
 
       const sess = res.data.session;
       setSessionId(sess._id);
       setSessionActive(true);
+      setOtp(sess.otp);
       setTimer(sessionForm.duration * 60);
       alert(
-        "Attendance session started! Students can now mark their presence.",
+        "Attendance session started! Students can now mark their presence using the OTP.",
       );
     } catch (err) {
       console.error("Start session error:", err);
       alert(err.response?.data?.message || "Failed to start session.");
+    } finally {
+      setLocationLoading(false);
     }
   };
 
@@ -235,6 +288,7 @@ const Attendance = () => {
       await api.put(`/attendance/close/${sessionId}`, { userId: user._id });
       setSessionActive(false);
       setSessionId(null);
+      setOtp("");
       alert("Attendance session closed.");
       fetchHistory();
     } catch (err) {
@@ -251,10 +305,12 @@ const Attendance = () => {
       if (filters.studentId !== "all")
         params.append("studentId", filters.studentId);
       if (filters.type !== "all") params.append("type", filters.type);
+      if (filters.sessionId && filters.sessionId !== "all")
+        params.append("sessionId", filters.sessionId);
 
       const res = await api.get(`/attendance/history?${params.toString()}`);
-      console.log(res.data.history);
       setHistory(res.data.history || []);
+      setSessions(res.data.sessions || []);
       setSummary(
         res.data.summary || {
           totalClasses: 0,
@@ -272,6 +328,26 @@ const Attendance = () => {
       setHistoryLoading(false);
     }
   }, [activeSubject, filters]);
+
+  const handleRemoveRecord = async (stdId) => {
+    try {
+      await api.delete(`/attendance/record/${sessionId}/${stdId}`);
+      fetchOngoingStudents();
+    } catch (e) {
+      alert("Failed to remove record");
+    }
+  };
+
+  const handleManualAdd = async (stdId) => {
+    try {
+      await api.post("/attendance/record/add", { sessionId, studentId: stdId });
+      fetchOngoingStudents();
+      setShowManualAdd(false);
+      setSearchQuery("");
+    } catch (e) {
+      alert(e.response?.data?.message || "Failed to add student");
+    }
+  };
 
   if (!activeSubject) {
     return (
@@ -430,9 +506,17 @@ const Attendance = () => {
 
                 <button
                   type="submit"
-                  className="w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs tracking-widest uppercase shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-3 active:scale-[0.98]"
+                  disabled={locationLoading}
+                  className={`w-full py-4 bg-indigo-600 text-white rounded-2xl font-black text-xs tracking-widest uppercase shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all flex items-center justify-center gap-3 active:scale-[0.98] ${
+                    locationLoading ? "opacity-70 cursor-not-allowed" : ""
+                  }`}
                 >
-                  <span className="text-lg">📡</span> Start Attendance Broadcast
+                  <span className="text-lg">
+                    {locationLoading ? "⏳" : "📡"}
+                  </span>{" "}
+                  {locationLoading
+                    ? "Capturing Location..."
+                    : "Start Attendance Broadcast"}
                 </button>
               </form>
             ) : (
@@ -449,6 +533,26 @@ const Attendance = () => {
                   </h2>
                   <p className="text-xs font-bold text-gray-400 uppercase mt-4 tracking-widest">
                     Time Remaining
+                  </p>
+                </div>
+
+                {/* OTP DISPLAY */}
+                <div className="bg-indigo-50 border border-indigo-100 rounded-3xl p-6 text-center shadow-sm">
+                  <p className="text-[10px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-3">
+                    Verification OTP
+                  </p>
+                  <div className="flex justify-center gap-3">
+                    {otp.split("").map((digit, i) => (
+                      <div
+                        key={i}
+                        className="w-12 h-16 bg-white border-2 border-indigo-100 rounded-2xl flex items-center justify-center text-3xl font-black text-indigo-600 shadow-sm"
+                      >
+                        {digit}
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[9px] font-bold text-indigo-300 mt-4 uppercase tracking-widest">
+                    Share this code with your students
                   </p>
                 </div>
 
@@ -481,12 +585,52 @@ const Attendance = () => {
                   )}
                 </div>
 
-                <button
-                  onClick={handleCloseSession}
-                  className="w-full py-4 bg-red-600 text-white rounded-2xl font-black text-xs tracking-widest uppercase shadow-lg shadow-red-100 hover:bg-red-700 transition-all flex items-center justify-center gap-3"
-                >
-                  <span className="text-lg">⏹</span> Terminate Session
-                </button>
+                  <button
+                    onClick={handleCloseSession}
+                    className="w-full py-4 bg-red-600 text-white rounded-2xl font-black text-xs tracking-widest uppercase shadow-lg shadow-red-100 hover:bg-red-700 transition-all flex items-center justify-center gap-3"
+                  >
+                    <span className="text-lg">⏹</span> Terminate Session
+                  </button>
+
+                  <div className="pt-6 border-t border-gray-50 text-black">
+                    <div className="flex justify-between items-center mb-4 px-2">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                        Marked Students ({ongoingStudents.length})
+                      </p>
+                      <button
+                        onClick={() => setShowManualAdd(true)}
+                        className="text-[10px] font-black text-indigo-600 uppercase hover:underline"
+                      >
+                        + Manual Add
+                      </button>
+                    </div>
+                    <div className="space-y-2 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+                      {ongoingStudents.length === 0 ? (
+                        <p className="text-[10px] text-gray-300 italic text-center py-4">
+                          Waiting for students to join...
+                        </p>
+                      ) : (
+                        ongoingStudents.map((rec) => (
+                          <div
+                            key={rec._id}
+                            className="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-100 group"
+                          >
+                            <span className="text-[11px] font-black text-gray-700">
+                              {rec.student?.rollNumber} - {rec.student?.firstName}
+                            </span>
+                            <button
+                              onClick={() =>
+                                handleRemoveRecord(rec.student?._id)
+                              }
+                              className="text-[9px] font-black text-red-400 uppercase opacity-0 group-hover:opacity-100 transition-opacity hover:text-red-600"
+                            >
+                              Remove
+                            </button>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
               </div>
             )}
           </Card>
@@ -550,6 +694,20 @@ const Attendance = () => {
                     </option>
                   ))}
                 </select>
+                <select
+                  className="pl-3 pr-8 py-2 bg-gray-50 border border-gray-100 rounded-xl text-[10px] font-black uppercase tracking-widest focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+                  value={filters.sessionId || "all"}
+                  onChange={(e) =>
+                    setFilters({ ...filters, sessionId: e.target.value })
+                  }
+                >
+                  <option value="all">Every Session</option>
+                  {sessions.map((sess) => (
+                    <option key={sess._id} value={sess._id}>
+                      {sess.date} - {sess.type}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -610,8 +768,8 @@ const Attendance = () => {
                   <thead>
                     <tr className="text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50 text-left">
                       <th className="px-8 py-5">Date</th>
-                      <th className="px-8 py-5">Student Identity</th>
-                      <th className="px-8 py-5 text-center">Verification</th>
+                      <th className="px-8 py-5">Student</th>
+                      <th className="px-8 py-5 text-center">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -629,25 +787,53 @@ const Attendance = () => {
                           </p>
                         </td>
                         <td className="px-8 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center text-[10px] font-black text-indigo-600">
-                              {record.studentName.charAt(0)}
+                          {record.isSessionRow ? (
+                             <div className="flex flex-col">
+                               <span className="text-[11px] font-black text-gray-900 uppercase tracking-tight">
+                                 {record.topic || "Session Summary"}
+                               </span>
+                               <span className="text-[9px] font-bold text-indigo-400 uppercase tracking-widest">
+                                 {record.sessionType}
+                               </span>
+                             </div>
+                          ) : (
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center text-[10px] font-black text-indigo-600">
+                                {record.studentName.charAt(0)}
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-[11px] font-black text-gray-900 uppercase tracking-tight">
+                                  {record.studentName}
+                                </span>
+                                <span className="text-[9px] font-bold text-gray-400">
+                                  ROLL: {record.studentRoll}
+                                </span>
+                              </div>
                             </div>
-                            <span className="text-[11px] font-black text-gray-900 uppercase tracking-tight">
-                              {record.studentName}
-                            </span>
-                          </div>
+                          )}
                         </td>
                         <td className="px-8 py-4 text-center">
-                          <span
-                            className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${
-                              record.status === "PRESENT"
-                                ? "bg-emerald-50 text-emerald-600 border-emerald-100"
-                                : "bg-red-50 text-red-600 border-red-100"
-                            }`}
-                          >
-                            {record.status}
-                          </span>
+                          {record.isSessionRow ? (
+                            <div className="flex items-center justify-center gap-4">
+                              <div className="text-center">
+                                <p className="text-[11px] font-black text-indigo-600">{record.presentCount}P / {record.absentCount}A</p>
+                                <p className="text-[8px] font-bold text-gray-400 uppercase">Class Stats</p>
+                              </div>
+                              <div className={`px-2 py-0.5 rounded-full text-[9px] font-black ${record.sessionRate >= 75 ? 'bg-emerald-50 text-emerald-600' : 'bg-amber-50 text-amber-600'}`}>
+                                {record.sessionRate}%
+                              </div>
+                            </div>
+                          ) : (
+                            <span
+                              className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-widest border ${
+                                record.status === "PRESENT"
+                                  ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                                  : "bg-red-50 text-red-600 border-red-100"
+                              }`}
+                            >
+                              {record.status}
+                            </span>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -657,7 +843,7 @@ const Attendance = () => {
             </div>
 
             {/* FOOTER */}
-            <div className="p-4 bg-gray-50/30 border-t border-gray-50 text-center">
+            <div className="p-4 bg-gray-50/30 border-t border-gray-50 text-center text-black">
               <p className="text-[9px] font-black text-gray-300 uppercase tracking-[0.2em]">
                 Showing {history.length} Entries • End of subject logs
               </p>
@@ -665,6 +851,70 @@ const Attendance = () => {
           </Card>
         </div>
       </div>
+
+      {/* Manual Add Overlay */}
+      {showManualAdd && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2rem] w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200 text-black">
+            <div className="p-8 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
+              <div>
+                <h3 className="text-xl font-black text-gray-900 tracking-tight">Manual Attendance</h3>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mt-1">Select student to mark present</p>
+              </div>
+              <button 
+                onClick={() => setShowManualAdd(false)}
+                className="w-10 h-10 rounded-full bg-white shadow-sm border border-gray-100 flex items-center justify-center text-gray-400 hover:text-red-500 transition-colors"
+                type="button"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="p-8 space-y-6">
+              <div className="relative">
+                <input 
+                  type="text"
+                  placeholder="Search by name or roll number..."
+                  className="w-full pl-12 pr-4 py-4 bg-gray-50 border border-gray-100 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-500/10 font-medium transition-all"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  autoFocus
+                />
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xl">🔍</span>
+              </div>
+
+              <div className="space-y-2 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                {students
+                  .filter(st => 
+                    st.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                    st.roll.toLowerCase().includes(searchQuery.toLowerCase())
+                  )
+                  .map(st => (
+                    <div key={st._id} className="flex items-center justify-between p-4 hover:bg-gray-50 rounded-2xl transition-colors border border-transparent hover:border-gray-100 group">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black text-xs">
+                          {st.name.charAt(0)}
+                        </div>
+                        <div>
+                          <p className="text-sm font-black text-gray-900">{st.name}</p>
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">ROLL: {st.roll}</p>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={() => handleManualAdd(st._id)}
+                        className="px-4 py-2 bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest rounded-xl shadow-lg shadow-indigo-100 hover:bg-indigo-700 active:scale-95 transition-all"
+                        type="button"
+                      >
+                        Add
+                      </button>
+                    </div>
+                  ))
+                }
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

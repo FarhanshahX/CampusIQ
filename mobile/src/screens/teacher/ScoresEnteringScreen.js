@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import api from "../../api/axios";
 import { useAuth } from "../../context/AuthContext";
@@ -32,7 +33,7 @@ const ScoreInput = ({ label, value, onChangeText, highlight }) => (
       value={value}
       onChangeText={onChangeText}
       placeholder="—"
-      placeholderTextColor="#C4C9D4"
+      placeholderTextColor="#6b7280"
     />
   </View>
 );
@@ -56,6 +57,7 @@ export default function ScoresEnteringScreen() {
   const [attendanceFetching, setAttendanceFetching] = useState(false);
   const [isMarksLocked, setIsMarksLocked] = useState(false);
   const [lockToggling, setLockToggling] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const [internal, setInternal] = useState(Array(6).fill(""));
   const [experiments, setExperiments] = useState(Array(10).fill(""));
@@ -70,9 +72,18 @@ export default function ScoresEnteringScreen() {
 
   // Fetch students list on mount
   useEffect(() => {
-    api.get("/admin/students").then((res) => {
-      setStudents(res.data);
-    });
+    api
+      .get("/admin/students", {
+        params: { userId: user?._id },
+      })
+      .then((res) => {
+        const sorted = (res.data || []).sort((a, b) =>
+          a.rollNumber.localeCompare(b.rollNumber, undefined, {
+            numeric: true,
+          }),
+        );
+        setStudents(sorted);
+      });
     // fetchMarkLockStatus will be called in the next useEffect with activeSubject
   }, []);
 
@@ -287,6 +298,17 @@ export default function ScoresEnteringScreen() {
     }
   };
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    const promises = [fetchMarkLockStatus(activeSubject?._id)];
+    if (selectedStudent && activeSubject) {
+      promises.push(fetchStudentScores(selectedStudent, activeSubject._id));
+      promises.push(fetchAttendanceScore(selectedStudent, activeSubject._id));
+    }
+    await Promise.all(promises);
+    setRefreshing(false);
+  };
+
   // ── Render helpers ────────────────────────────────────────────────────────
 
   const renderGrid = (data, setData, label) => (
@@ -318,6 +340,9 @@ export default function ScoresEnteringScreen() {
         style={styles.container}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
         {/* Page Header */}
         <View style={styles.pageHeader}>
@@ -342,11 +367,15 @@ export default function ScoresEnteringScreen() {
               onValueChange={(value) => setSelectedStudent(value)}
               style={styles.picker}
             >
-              <Picker.Item label="Select a student..." value="" />
+              <Picker.Item
+                label="Select a student..."
+                value=""
+                color="#6b7280"
+              />
               {students.map((s) => (
                 <Picker.Item
                   key={s._id}
-                  label={`${s.registrationNumber}  -  ${s.firstName} ${s.lastName}`}
+                  label={`${s.rollNumber}  -  ${s.firstName} ${s.lastName}`}
                   value={s._id}
                 />
               ))}
@@ -442,7 +471,8 @@ export default function ScoresEnteringScreen() {
         </View>
 
         {/* ── Practical / Oral ── */}
-        {currentSubjectType === "Theory+Lab+Practical" && (
+        {(currentSubjectType === "Theory+Lab+Practical" ||
+          currentSubjectType === "Lab+Practical") && (
           <View style={[styles.card, isBusy && styles.cardDimmed]}>
             <SectionHeader title="Practical / Oral" subtitle="Out of 25" />
             <View style={styles.grid}>
@@ -538,7 +568,7 @@ export default function ScoresEnteringScreen() {
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F7F8FA" },
+  container: { color: "#000", flex: 1, backgroundColor: "#F7F8FA" },
   content: { padding: 20 },
 
   // Page Header

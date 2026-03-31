@@ -10,6 +10,7 @@ import {
   Modal,
   TextInput,
   Alert,
+  RefreshControl,
 } from "react-native";
 import { LineChart } from "react-native-chart-kit";
 import { Picker } from "@react-native-picker/picker";
@@ -39,6 +40,7 @@ const DashboardScreen = () => {
   // Analytics
   const [overallAttendance, setOverallAttendance] = useState("0");
   const [fetching, setFetching] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [internal, setInternal] = useState(Array(6).fill(0));
   const [experiments, setExperiments] = useState(Array(10).fill(""));
   const [assignments, setAssignments] = useState(Array(2).fill(""));
@@ -73,7 +75,9 @@ const DashboardScreen = () => {
       }
 
       // Fetch announcements (Top 2 important)
-      const annRes = await api.get(`/announcements/student`);
+      const annRes = await api.get(
+        `/announcements/student?departmentId=${user.departmentID}`,
+      );
       const importantAnns = annRes.data
         .filter((a) => a.isImportant)
         .slice(0, 2);
@@ -90,6 +94,15 @@ const DashboardScreen = () => {
     } catch (error) {
       console.error("Error fetching initial data", error);
     }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchInitialData();
+    if (selectedSubject) {
+      await fetchScores(selectedSubject);
+    }
+    setRefreshing(false);
   };
 
   const fetchTasks = async () => {
@@ -216,7 +229,12 @@ const DashboardScreen = () => {
 
   return (
     <View style={styles.mainContainer}>
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
         {/* 1. ANNOUNCEMENTS */}
         {announcements.length > 0 && (
           <View style={styles.card}>
@@ -477,6 +495,7 @@ const DashboardScreen = () => {
                 value={taskTitle}
                 onChangeText={setTaskTitle}
                 placeholder="E.g., Complete DBMS Lab"
+                placeholderTextColor="#6B7280"
               />
             </View>
 
@@ -488,6 +507,7 @@ const DashboardScreen = () => {
                 onChangeText={setTaskDescription}
                 multiline
                 placeholder="Add details..."
+                placeholderTextColor="#6B7280"
               />
             </View>
 
@@ -545,10 +565,12 @@ const chartConfig = {
 
 const styles = StyleSheet.create({
   mainContainer: {
+    color: "#000",
     flex: 1,
     backgroundColor: "#F3F4F6",
   },
   container: {
+    color: "#000",
     padding: 16,
     paddingBottom: 40,
   },
@@ -730,6 +752,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   pickerWrapper: {
+    color: "#000",
     borderWidth: 1,
     borderColor: "#E5E7EB",
     borderRadius: 10,
@@ -737,6 +760,7 @@ const styles = StyleSheet.create({
     overflow: "hidden",
   },
   picker: {
+    color: "#000",
     height: 50,
   },
   row: {

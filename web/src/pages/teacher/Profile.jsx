@@ -93,7 +93,8 @@ const Profile = () => {
       setIsEditing(false);
     } catch (error) {
       console.error("Error updating profile", error);
-      const errorMsg = error.response?.data?.message || "Failed to update profile";
+      const errorMsg =
+        error.response?.data?.message || "Failed to update profile";
       setMessage({ type: "error", text: errorMsg });
     } finally {
       setSaving(false);
@@ -597,7 +598,7 @@ const Profile = () => {
                     >
                       <div className="overflow-hidden">
                         <p
-                          className={`font-bold text-sm truncate ${isActive ? "text-indigo-700" : "text-gray-900"}`}
+                          className={`font-bold text-sm truncate ${isActive ? "text-indigo-700" : "text-white"}`}
                         >
                           {subject.subjectName}
                         </p>

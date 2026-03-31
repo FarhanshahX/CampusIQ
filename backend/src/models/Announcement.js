@@ -25,6 +25,10 @@ const announcementSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: "Subject",
   },
+  department: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Department",
+  },
   createdAt: {
     type: Date,
     default: Date.now,

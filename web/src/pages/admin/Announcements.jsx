@@ -68,17 +68,29 @@ const Announcements = () => {
   const [deadline, setDeadline] = useState("");
 
   // data
+  // State
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState("");
-  const [filter, setFilter] = useState("all"); // "all" | "important"
+  const [filter, setFilter] = useState("all");
+  const [deptId, setDeptId] = useState(null);
 
-  const fetchAnnouncements = useCallback(async () => {
+  const fetchDepartment = useCallback(async () => {
+    try {
+      const id = adminId();
+      const res = await api.get(`/admin/department/${id}`);
+      setDeptId(res.data._id);
+    } catch (e) {
+      console.error("Error fetching department", e);
+    }
+  }, []);
+
+  const fetchAnnouncements = useCallback(async (dId) => {
+    if (!dId) return;
     setLoading(true);
     try {
-      // Fetch everything (admin can see all)
-      const res = await api.get("/announcements/student");
+      const res = await api.get(`/announcements/student?departmentId=${dId}`);
       setAnnouncements(res.data || []);
     } catch (e) {
       console.error("Error fetching announcements", e);
@@ -88,8 +100,14 @@ const Announcements = () => {
   }, []);
 
   useEffect(() => {
-    fetchAnnouncements();
-  }, [fetchAnnouncements]);
+    fetchDepartment();
+  }, [fetchDepartment]);
+
+  useEffect(() => {
+    if (deptId) {
+      fetchAnnouncements(deptId);
+    }
+  }, [deptId, fetchAnnouncements]);
 
   const handlePost = async () => {
     if (!title.trim() || !message.trim()) {
@@ -110,7 +128,7 @@ const Announcements = () => {
       setMessage("");
       setIsImportant(false);
       setDeadline("");
-      fetchAnnouncements();
+      fetchAnnouncements(deptId);
     } catch (e) {
       setFormError(
         e?.response?.data?.message || "Failed to post announcement.",
@@ -188,7 +206,7 @@ const Announcements = () => {
             className={`flex items-center gap-1.5 px-4 py-2 text-sm font-medium rounded-lg border transition cursor-pointer ${
               isImportant
                 ? "bg-amber-50 border-amber-300 text-amber-700"
-                : "bg-gray-50 border-gray-200 text-gray-500 hover:bg-gray-100"
+                : "bg-gray-50 border-gray-200 text-white hover:bg-gray-100"
             }`}
           >
             {isImportant ? "★ Marked Important" : "☆ Mark Important"}
@@ -250,8 +268,8 @@ const Announcements = () => {
                 onClick={() => setFilter(f)}
                 className={`px-3 py-1.5 rounded-md transition capitalize cursor-pointer ${
                   filter === f
-                    ? "bg-white text-gray-900 shadow-sm"
-                    : "text-gray-500 hover:text-gray-700"
+                    ? "bg-white text-indigo-900 shadow-sm"
+                    : "text-white hover:text-gray-700"
                 }`}
               >
                 {f === "important" ? "★ Important" : "All"}

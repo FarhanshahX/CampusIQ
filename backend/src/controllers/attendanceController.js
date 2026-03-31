@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const crypto = require("crypto");
+const geolib = require("geolib");
 const AttendanceSession = require("../models/AttendanceSession.js");
 const AttendanceRecord = require("../models/AttendanceRecord.js");
 const Student = require("../models/Student.js");
@@ -61,6 +62,8 @@ const startAttendanceSession = async (req, res) => {
       duration,
       topic,
       totalStudents, // number of enrolled students — used for absent calculation
+      latitude,
+      longitude,
       user,
     } = req.body;
 
@@ -79,6 +82,16 @@ const startAttendanceSession = async (req, res) => {
       });
     }
 
+    if (!latitude || !longitude) {
+      return res.status(400).json({
+        message:
+          "Teacher location (latitude/longitude) is required to start a session.",
+      });
+    }
+
+    // Generate a simple 4-digit numeric OTP
+    const otp = Math.floor(1000 + Math.random() * 9000).toString();
+
     // Only attach section for Practical sessions
     const sessionData = {
       subject,
@@ -92,7 +105,9 @@ const startAttendanceSession = async (req, res) => {
       duration,
       topic: topic || "",
       totalStudents: totalStudents || 0,
-      bluetoothToken: crypto.randomBytes(16).toString("hex"),
+      otp,
+      latitude,
+      longitude,
     };
 
     if (sessionType === "Practical" && section) {
@@ -108,9 +123,12 @@ const startAttendanceSession = async (req, res) => {
       { path: "department", select: "departmentName" },
     ]);
 
+    const sessionObj = populated.toObject();
+    sessionObj.remainingSeconds = duration * 60;
+
     res.status(201).json({
       message: "Attendance session started",
-      session: populated,
+      session: sessionObj,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -119,12 +137,14 @@ const startAttendanceSession = async (req, res) => {
 
 const markAttendance = async (req, res) => {
   try {
-    const { sessionId, studentId, bluetoothToken, deviceId, user } = req.body;
+    const { sessionId, studentId, otp, latitude, longitude, deviceId, user } =
+      req.body;
 
     // 1. Validate required fields
-    if (!sessionId || !bluetoothToken || !deviceId) {
+    if (!sessionId || !otp || !latitude || !longitude || !deviceId) {
       return res.status(400).json({
-        message: "sessionId, bluetoothToken and deviceId are required.",
+        message:
+          "sessionId, otp, latitude, longitude and deviceId are required.",
       });
     }
 
@@ -144,13 +164,21 @@ const markAttendance = async (req, res) => {
         .json({ message: "This attendance session has already closed." });
     }
 
-    // 3. Verify bluetooth token — constant-time compare prevents timing attacks
-    const tokenMatch = crypto.timingSafeEqual(
-      Buffer.from(session.bluetoothToken),
-      Buffer.from(bluetoothToken),
+    // 3. Verify OTP
+    if (session.otp !== otp) {
+      return res.status(403).json({ message: "Invalid OTP code." });
+    }
+
+    // 3.5 Verify Distance (within 5 meters)
+    const distance = geolib.getDistance(
+      { latitude: session.latitude, longitude: session.longitude },
+      { latitude, longitude },
     );
-    if (!tokenMatch) {
-      return res.status(403).json({ message: "Invalid Bluetooth token." });
+
+    if (distance > 5) {
+      return res.status(403).json({
+        message: `You are too far from the teacher (${distance}m). Please move closer.`,
+      });
     }
 
     // 4. For Practical sessions — verify the student belongs to this section
@@ -244,7 +272,17 @@ const getActiveTeacherSession = async (req, res) => {
 
     // Lazy-close if expired
     const activeSession = await checkAndCloseIfExpired(session);
-    res.json(activeSession);
+    if (!activeSession) return res.json(null);
+
+    const expiresAt = new Date(
+      activeSession.createdAt.getTime() + activeSession.duration * 60000,
+    );
+    const remainingSeconds = Math.max(
+      0,
+      Math.floor((expiresAt - Date.now()) / 1000),
+    );
+
+    res.json({ ...activeSession.toObject(), remainingSeconds });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -257,8 +295,7 @@ const getActiveTeacherSession = async (req, res) => {
 // ─────────────────────────────────────────────────────────────────────────────
 const getAttendanceHistory = async (req, res) => {
   try {
-    const { subjectId, month, studentId, type } = req.query;
-
+    const { subjectId, month, studentId, type, sessionId } = req.query;
     if (!subjectId) {
       return res.status(400).json({ message: "subjectId is required." });
     }
@@ -296,6 +333,10 @@ const getAttendanceHistory = async (req, res) => {
 
     if (type && type !== "all") {
       sessionQuery.sessionType = type;
+    }
+
+    if (sessionId && sessionId !== "all") {
+      sessionQuery._id = new mongoose.Types.ObjectId(sessionId);
     }
 
     const sessions = await AttendanceSession.find(sessionQuery)
@@ -369,23 +410,27 @@ const getAttendanceHistory = async (req, res) => {
       };
     });
 
-    // ── Step 4: summary ───────────────────────────────────────────────────
+    // ── Step 4: summary & history formatting ─────────────────────────────
     const totalClasses = sessions.length;
     let totalPresent = records.length;
     let totalAbsent = 0;
     let rate = 0;
 
+    let historyResult = [];
+
     if (studentId && studentId !== "all") {
-      // Single student summary
+      // ── CASE A: Single student summary ───────────────────────────
       totalPresent = records.length;
       totalAbsent = totalClasses - totalPresent;
       rate =
         totalClasses > 0 ? Math.round((totalPresent / totalClasses) * 100) : 0;
+
+      historyResult = history;
     } else {
-      // Overall class summary
+      // ── CASE B: Class-wide summary (1 or multiple sessions) ──────
+      totalPresent = records.length;
       totalAbsent = sessions.reduce((acc, sess) => {
         const presentInSess = presentMap[sess._id.toString()].size;
-        // If sess.totalStudents is 0, fall back to current enrollment count
         const expected = sess.totalStudents || allStudentsEnrolled.length;
         return acc + Math.max(0, expected - presentInSess);
       }, 0);
@@ -393,6 +438,39 @@ const getAttendanceHistory = async (req, res) => {
         totalPresent + totalAbsent > 0
           ? Math.round((totalPresent / (totalPresent + totalAbsent)) * 100)
           : 0;
+
+      if (req.query.sessionId && req.query.sessionId !== "all") {
+        // Individual students for that ONE session
+        historyResult = history;
+      } else {
+        // High-level session summaries
+        historyResult = sessions.map((sess) => {
+          const d = new Date(sess.date);
+          const presentCount = presentMap[sess._id.toString()].size;
+          const total = sess.totalStudents || allStudentsEnrolled.length;
+          const sessionRate =
+            total > 0 ? Math.round((presentCount / total) * 100) : 0;
+
+          return {
+            _id: sess._id.toString(),
+            isSessionRow: true,
+            date: d.toLocaleDateString("en-GB", {
+              day: "2-digit",
+              month: "short",
+              year: "numeric",
+            }),
+            time: new Date(sess.lectureStart).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            sessionType: sess.sessionType,
+            topic: sess.topic || "",
+            presentCount,
+            absentCount: Math.max(0, total - presentCount),
+            sessionRate,
+          };
+        });
+      }
     }
 
     // ── Step 5: student list for the filter dropdown (all enrolled) ─────────
@@ -403,7 +481,7 @@ const getAttendanceHistory = async (req, res) => {
     }));
 
     res.json({
-      history,
+      history: historyResult,
       summary: {
         totalClasses,
         attended: totalPresent,
@@ -411,6 +489,12 @@ const getAttendanceHistory = async (req, res) => {
         rate,
       },
       students: studentsForFilter,
+      sessions: sessions.map((s) => ({
+        _id: s._id,
+        date: new Date(s.date).toLocaleDateString(),
+        type: s.sessionType,
+        topic: s.topic,
+      })),
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -562,20 +646,139 @@ const getStudentOverallAttendance = async (req, res) => {
   }
 };
 
+const getSessionMarkingStudents = async (req, res) => {
+  try {
+    const { sessionId } = req.params;
+    const records = await AttendanceRecord.find({ session: sessionId })
+      .populate("student", "firstName lastName rollNumber")
+      .sort({ createdAt: -1 });
+
+    res.json(records);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const addAttendanceRecord = async (req, res) => {
+  try {
+    const { sessionId, studentId } = req.body;
+
+    const existing = await AttendanceRecord.findOne({
+      session: sessionId,
+      student: studentId,
+    });
+    if (existing) {
+      return res.status(400).json({ message: "Attendance already marked" });
+    }
+
+    const record = await AttendanceRecord.create({
+      session: sessionId,
+      student: studentId,
+      deviceId: "MANUAL_ENTRY_" + Date.now(),
+    });
+
+    res.status(201).json(record);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const removeAttendanceRecord = async (req, res) => {
+  try {
+    const { sessionId, studentId } = req.params;
+    await AttendanceRecord.findOneAndDelete({
+      session: sessionId,
+      student: studentId,
+    });
+    res.json({ message: "Attendance removed" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 const getActiveSessions = async (req, res) => {
   try {
-    const sessions = await AttendanceSession.find({
-      status: "active",
-    });
+    const { departmentId, section } = req.query;
+
+    const query = { status: "active" };
+    if (departmentId) {
+      query.department = departmentId;
+    }
+
+    if (section) {
+      // For practicals, must match section. For others, show if department matches.
+      query.$or = [
+        { sessionType: { $ne: "Practical" } },
+        { sessionType: "Practical", section: section },
+      ];
+    }
+
+    const sessions = await AttendanceSession.find(query)
+      .populate("subject", "subjectName")
+      .populate("teacher", "firstName lastName");
 
     // Lazy-close all expired sessions found
     const filteredSessions = [];
     for (const sess of sessions) {
       const active = await checkAndCloseIfExpired(sess);
-      if (active) filteredSessions.push(active);
+      if (active) {
+        const expiresAt = new Date(
+          active.createdAt.getTime() + active.duration * 60000,
+        );
+        const remainingSeconds = Math.max(
+          0,
+          Math.floor((expiresAt - Date.now()) / 1000),
+        );
+        filteredSessions.push({ ...active.toObject(), remainingSeconds });
+      }
     }
 
     res.json(filteredSessions);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const getAttendanceScore = async (req, res) => {
+  try {
+    const { studentId, subjectName } = req.params;
+
+    // 1. Find the subject by name to get its ID
+    const Subject = require("../models/Subject.js");
+    const subject = await Subject.findOne({ subjectName: subjectName });
+    if (!subject) {
+      return res.status(404).json({ message: "Subject not found" });
+    }
+
+    // 2. Count total closed sessions for this subject
+    const totalSessions = await AttendanceSession.countDocuments({
+      subject: subject._id,
+      status: "closed",
+    });
+
+    if (totalSessions === 0) {
+      return res.json({ attendanceScore: 5 }); // Default to 5 if no classes yet
+    }
+
+    // 3. Count sessions student attended
+    const attendedSessions = await AttendanceRecord.countDocuments({
+      student: studentId,
+      session: {
+        $in: await AttendanceSession.find({
+          subject: subject._id,
+          status: "closed",
+        }).distinct("_id"),
+      },
+    });
+
+    // 4. Calculate percentage and map to score
+    const percentage = (attendedSessions / totalSessions) * 100;
+    let score = 2;
+    if (percentage >= 75) score = 5;
+    else if (percentage >= 50) score = 4;
+    else if (percentage >= 20) score = 3;
+
+    res.json({ attendanceScore: score, percentage });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -586,8 +789,12 @@ module.exports = {
   markAttendance,
   closeAttendanceSession,
   getActiveSessions,
-  getActiveTeacherSession, // Exported
+  getActiveTeacherSession,
   getAttendanceHistory,
   getStudentAttendanceHistory,
   getStudentOverallAttendance,
+  getAttendanceScore,
+  getSessionMarkingStudents,
+  addAttendanceRecord,
+  removeAttendanceRecord,
 };

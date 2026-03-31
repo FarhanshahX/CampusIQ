@@ -81,7 +81,7 @@ const StudentHeader = () => {
 
 const styles = StyleSheet.create({
   container: {
-    paddingTop: 25,
+    paddingTop: 0,
     paddingHorizontal: 15,
     paddingBottom: 15,
     backgroundColor: "#fff",
@@ -104,6 +104,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   name: {
+    color: "#000",
     fontSize: 16,
     fontWeight: "bold",
   },

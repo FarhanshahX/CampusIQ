@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Linking,
   Modal,
+  RefreshControl,
 } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import api, { API_BASE_URL } from "../../api/axios";
@@ -321,6 +322,7 @@ export default function TeacherResourceScreen() {
   const { activeSubject } = useAuth();
   const [resources, setResources] = useState([]);
   const [loadingResources, setLoadingResources] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [showUpload, setShowUpload] = useState(false);
 
   const fetchResources = useCallback(async () => {
@@ -338,6 +340,12 @@ export default function TeacherResourceScreen() {
       setLoadingResources(false);
     }
   }, [activeSubject]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchResources();
+    setRefreshing(false);
+  };
 
   useEffect(() => {
     fetchResources();
@@ -400,6 +408,9 @@ export default function TeacherResourceScreen() {
           style={styles.list}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
         >
           <SectionDivider title="UPLOADED FILES" />
 
@@ -437,7 +448,7 @@ export default function TeacherResourceScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#F7F8FA" },
+  screen: { color: "#000", flex: 1, backgroundColor: "#F7F8FA" },
 
   // Header
   header: {

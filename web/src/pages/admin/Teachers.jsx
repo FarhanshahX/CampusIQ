@@ -7,8 +7,10 @@ const Teachers = () => {
   const navigate = useNavigate();
   const [teachers, setTeachers] = useState([]);
 
+  const adminID = localStorage.getItem("userID");
+
   const fetchTeachers = async () => {
-    const res = await api.get("/admin/teachers");
+    const res = await api.get(`/admin/teachers?adminID=${adminID}`);
     setTeachers(res.data);
   };
 

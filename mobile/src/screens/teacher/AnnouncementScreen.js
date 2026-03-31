@@ -9,6 +9,7 @@ import {
   FlatList,
   ActivityIndicator,
   Alert,
+  RefreshControl,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -56,6 +57,7 @@ export default function AnnouncementScreen() {
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   // ─────────────────────────────────────────────
   // INIT
@@ -87,6 +89,12 @@ export default function AnnouncementScreen() {
       setLoading(false);
     }
   }, []);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([fetchSubjects(), fetchAnnouncements()]);
+    setRefreshing(false);
+  };
 
   // ─────────────────────────────────────────────
   // HANDLERS
@@ -222,6 +230,9 @@ export default function AnnouncementScreen() {
       <ScrollView
         style={s.container}
         contentContainerStyle={{ paddingBottom: 40 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
         {/* PAGE HEADER */}
         <View style={s.pageHeader}>
@@ -241,6 +252,7 @@ export default function AnnouncementScreen() {
             placeholder="e.g. Midterm Exam Schedule"
             value={title}
             onChangeText={setTitle}
+            placeholderTextColor={"#111827"}
           />
 
           <Text style={s.label}>
@@ -253,6 +265,7 @@ export default function AnnouncementScreen() {
             onChangeText={setMessage}
             multiline
             textAlignVertical="top"
+            placeholderTextColor={"#111827"}
           />
 
           <Text style={s.label}>Subject (Optional)</Text>
@@ -356,6 +369,7 @@ export default function AnnouncementScreen() {
 // ─────────────────────────────────────────────
 const s = StyleSheet.create({
   container: {
+    color: "#000",
     flex: 1,
     backgroundColor: C.bg,
     paddingHorizontal: 16,

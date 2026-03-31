@@ -4,6 +4,7 @@ const Teacher = require("../models/Teacher.js");
 const AttendanceSession = require("../models/AttendanceSession.js");
 const AttendanceRecord = require("../models/AttendanceRecord.js");
 const Subject = require("../models/Subject.js");
+const Announcement = require("../models/Announcement.js");
 const SubjectScore = require("../models/SubjectScore.js");
 const Student = require("../models/Student.js");
 
@@ -113,7 +114,15 @@ const createTeacher = async (req, res) => {
 };
 
 const getTeachers = async (req, res) => {
-  const teachers = await Teacher.find().select("-password");
+  const { adminID } = req.query;
+  let query = {};
+  if (adminID) {
+    const admin = await Admin.findById(adminID);
+    if (admin && admin.department) {
+      query.department = admin.department;
+    }
+  }
+  const teachers = await Teacher.find(query).select("-password");
   res.json(teachers);
 };
 
@@ -441,12 +450,26 @@ const getAdminAnalytics = async (req, res) => {
       const scores = studentScoresMap[sid] || [];
       const totalMarks = scores.reduce((acc, sc) => acc + sc.totalMarks, 0);
 
+      const avgIA =
+        scores.length > 0
+          ? scores.reduce((acc, sc) => acc + (sc.internalTotal || 0), 0) /
+            scores.length
+          : 0;
+      const avgLab =
+        scores.length > 0
+          ? scores.reduce(
+              (acc, sc) =>
+                acc + (sc.experimentTotal || 0) + (sc.assignmentTotal || 0),
+              0,
+            ) / scores.length
+          : 0;
+
       if (latestCgpa > 0) {
         totalCgpa += latestCgpa;
         cgpaCount++;
       }
       totalAttRate += attRate;
-      if (attRate < 75 || latestCgpa < 5) atRiskCount++;
+      if (attRate < 50 || avgIA < 8) atRiskCount++;
 
       return {
         _id: sid,
@@ -460,6 +483,8 @@ const getAdminAnalytics = async (req, res) => {
         attended,
         totalSessions,
         totalMarks,
+        avgIA,
+        avgLab,
         subjectScores: scores,
       };
     });

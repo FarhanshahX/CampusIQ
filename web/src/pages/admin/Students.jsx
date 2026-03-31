@@ -13,7 +13,7 @@ const Students = () => {
   const adminID = localStorage.getItem("userID");
 
   const fetchStudents = async () => {
-    const res = await api.get("/admin/students");
+    const res = await api.get(`/admin/students?adminID=${adminID}`);
     setStudents(res.data);
   };
   const fetchDepartment = async (adminID) => {

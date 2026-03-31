@@ -22,21 +22,16 @@
     "android": {
       "newArchEnabled": false,
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/logo.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true,
+      "edgeToEdgeEnabled": false,
       "compileSdkVersion": 35,
-      "targetSdkVersion": 35,
-      "minSdkVersion": 23,
+      "targetSdkVersion": 34,
+      "minSdkVersion": 24,
       "permissions": [
         "READ_MEDIA_IMAGES",
-        "READ_EXTERNAL_STORAGE",
-        "android.permission.BLUETOOTH",
-        "android.permission.BLUETOOTH_ADMIN",
-        "android.permission.BLUETOOTH_CONNECT",
-        "android.permission.BLUETOOTH_ADVERTISE",
-        "android.permission.BLUETOOTH_SCAN"
+        "READ_EXTERNAL_STORAGE"
       ],
       "package": "com.farhan45.campusiq"
     },
@@ -51,23 +46,12 @@
     "plugins": [
       "@react-native-community/datetimepicker",
       [
-        "react-native-ble-plx",
-        {
-          "isBackgroundEnabled": false,
-          "modes": [
-            "peripheral",
-            "central"
-          ],
-          "bluetoothAlwaysPermission": "Used for proximity-based attendance"
-        }
-      ],
-      [
         "expo-build-properties",
         {
           "android": {
-            "compileSdkVersion": 34,
+            "compileSdkVersion": 35,
             "targetSdkVersion": 34,
-            "minSdkVersion": 23,
+            "minSdkVersion": 24,
             "newArchEnabled": false
           }
         }

@@ -10,12 +10,13 @@ import {
   FlatList,
   ActivityIndicator,
   Animated,
+  RefreshControl,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import { useAuth } from "../../context/AuthContext";
 import TeacherHeader from "../../components/TeacherHeader";
 import api from "../../api/axios";
-import { startAdvertising, stopAdvertising } from "../../utils/BLEManager";
+import * as Location from "expo-location";
 
 // ─────────────────────────────────────────────
 // CONSTANTS
@@ -138,18 +139,18 @@ const StatTile = ({ label, value, accent }) => (
   </View>
 );
 
-// ── BLE status indicator shown while session is active ────────────────────────
-const BleStatusChip = ({ advertising }) => (
-  <View
-    style={[
-      s.bleChip,
-      { backgroundColor: advertising ? "#E8F5E9" : "#FFF3E0" },
-    ]}
-  >
-    <Text style={s.bleChipIcon}>{advertising ? "📡" : "⚠️"}</Text>
-    <Text style={[s.bleChipText, { color: advertising ? C.success : C.warn }]}>
-      {advertising ? "BLE Broadcasting" : "BLE Stopped"}
-    </Text>
+// ── OTP display shown while session is active ────────────────────────
+const OtpDisplay = ({ otp }) => (
+  <View style={s.otpContainer}>
+    <Text style={s.otpLabel}>JOINING CODE (OTP)</Text>
+    <View style={s.otpBox}>
+      {otp.split("").map((digit, i) => (
+        <View key={i} style={s.otpDigitBox}>
+          <Text style={s.otpDigit}>{digit}</Text>
+        </View>
+      ))}
+    </View>
+    <Text style={s.otpSubtext}>Share this with your students</Text>
   </View>
 );
 
@@ -169,8 +170,8 @@ export default function TeacherAttendanceScreen() {
   // ── Active session ────────────────────────
   const [sessionId, setSessionId] = useState(null);
   const [sessionActive, setSessionActive] = useState(false);
-  const [bluetoothToken, setBluetoothToken] = useState(null);
-  const [advertising, setAdvertising] = useState(false); // BLE broadcast state
+  const [refreshing, setRefreshing] = useState(false);
+  const [otp, setOtp] = useState(null);
   const [timer, setTimer] = useState(0);
   const pulseAnim = useRef(new Animated.Value(1)).current;
 
@@ -188,6 +189,13 @@ export default function TeacherAttendanceScreen() {
   });
   const [historyLoading, setHistoryLoading] = useState(false);
 
+  // ── Ongoing monitoring ──────────────────
+  const [ongoingStudents, setOngoingStudents] = useState([]);
+  const [sessions, setSessions] = useState([]);
+  const [filterSession, setFilterSession] = useState("all");
+  const [showAddManual, setShowAddManual] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
   // ─────────────────────────────────────────
   // INIT
   // ─────────────────────────────────────────
@@ -204,17 +212,10 @@ export default function TeacherAttendanceScreen() {
       const sess = res.data;
       if (sess) {
         setSessionId(sess._id);
-        setBluetoothToken(sess.bluetoothToken);
+        setOtp(sess.otp);
         setSessionActive(true);
 
-        // Calculate remaining time
-        const createdAt = new Date(sess.createdAt).getTime();
-        const now = new Date().getTime();
-        const elapsedSec = Math.floor((now - createdAt) / 1000);
-        const totalSec = sess.duration * 60;
-        const remaining = Math.max(0, totalSec - elapsedSec);
-
-        setTimer(remaining);
+        setTimer(sess.remainingSeconds !== undefined ? sess.remainingSeconds : 0);
         setSessionType(sess.sessionType);
         if (sess.section) setSection(sess.section);
         setDuration(sess.duration);
@@ -252,63 +253,30 @@ export default function TeacherAttendanceScreen() {
   // Countdown timer
   useEffect(() => {
     if (!sessionActive || timer <= 0) return;
-    const id = setInterval(() => setTimer((p) => p - 1), 1000);
+    const id = setInterval(() => {
+      setTimer((p) => Math.max(0, p - 1));
+      fetchOngoingStudents();
+    }, 3000);
     return () => clearInterval(id);
-  }, [sessionActive, timer]);
+  }, [sessionActive, timer, sessionId]);
 
-  // Auto-close when timer hits 0
-  useEffect(() => {
-    if (sessionActive && timer === 0) handleCloseSession();
-  }, [timer, sessionActive]);
-
-  // ── BLE: start advertising when a session becomes active ─────────────────
-  useEffect(() => {
-    if (!sessionActive || !bluetoothToken) return;
-
-    let active = true;
-
-    (async () => {
-      try {
-        await startAdvertising(bluetoothToken);
-        if (active) setAdvertising(true);
-      } catch (err) {
-        console.warn("[BLE] Could not start advertising:", err.message);
-        // Non-fatal — session still works; BLE is just unavailable on this device
-        Alert.alert(
-          "Bluetooth Unavailable",
-          "Could not start BLE broadcast. Students will not be proximity-verified.\n\n" +
-            err.message,
-        );
-        if (active) setAdvertising(false);
-      }
-    })();
-
-    return () => {
-      active = false;
-    };
-  }, [sessionActive, bluetoothToken]);
-
-  // ── BLE: stop advertising when the session is no longer active ────────────
-  useEffect(() => {
-    if (!sessionActive && advertising) {
-      stopAdvertising().catch(console.warn);
-      setAdvertising(false);
+  const fetchOngoingStudents = async () => {
+    try {
+      const res = await api.get(`/attendance/session-marking/${sessionId}`);
+      setOngoingStudents(res.data || []);
+    } catch (e) {
+      console.log("fetchOngoingStudents:", e);
     }
-  }, [sessionActive]);
+  };
 
-  // Stop BLE on unmount (but DON'T close the server session)
-  useEffect(() => {
-    return () => {
-      if (advertising) {
-        stopAdvertising().catch(console.warn);
-      }
-    };
-  }, [advertising]);
+  // REMOVED: Auto-close when timer hits 0 to fix the race condition causing
+  // the session to abruptly close immediately on UI load due to React state batching.
+  // The backend lazily closes the session when students try to join or when queried.
 
   // Re-fetch history when filters change
   useEffect(() => {
     if (activeSubject) fetchHistory();
-  }, [filterMonth, filterStudent, filterType, activeSubject]);
+  }, [filterMonth, filterStudent, filterType, filterSession, activeSubject]);
 
   // ─────────────────────────────────────────
   // API CALLS
@@ -324,12 +292,24 @@ export default function TeacherAttendanceScreen() {
     }
     try {
       // ── Step 1: Get total count of enrolled students ──────────────────────
-      // We call the history endpoint with no filters to get the 'students' list
-      // which our backend now populates with all enrolled students.
       const historyRes = await api.get(
         `/attendance/history?subjectId=${activeSubject._id}`,
       );
       const enrolledCount = historyRes.data.students?.length || 0;
+
+      // ── Step 2: Get Current Location ──────────────────────────────────────
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permission Denied",
+          "Location permission is required to start a session.",
+        );
+        return;
+      }
+
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
 
       const [startTime, endTime] = lecturePeriod.split(" - ");
       const res = await api.post("/attendance/start", {
@@ -342,19 +322,21 @@ export default function TeacherAttendanceScreen() {
         lectureEnd: endTime.trim(),
         duration,
         topic,
-        totalStudents: enrolledCount, // ← pass the count here
+        totalStudents: enrolledCount,
+        latitude: location.coords.latitude,
+        longitude: location.coords.longitude,
         user: user._id,
       });
 
       const sess = res.data.session;
       setSessionId(sess._id);
-      setBluetoothToken(sess.bluetoothToken); // ← triggers the BLE useEffect above
+      setOtp(sess.otp);
       setSessionActive(true);
-      setTimer(duration * 60);
+      setTimer(sess.remainingSeconds !== undefined ? sess.remainingSeconds : duration * 60);
 
       Alert.alert(
         "Session Started",
-        "BLE broadcasting started. Students nearby can now mark attendance.",
+        "Your students can now see this session and mark presence by typing the JOINING CODE.",
       );
     } catch (e) {
       console.log(e.response?.data);
@@ -368,11 +350,9 @@ export default function TeacherAttendanceScreen() {
   const handleCloseSession = async () => {
     try {
       await api.put(`/attendance/close/${sessionId}`, { userId: user._id });
-      await stopAdvertising(); // ← stop BLE broadcast
-      setAdvertising(false);
       setSessionActive(false);
       setSessionId(null);
-      setBluetoothToken(null);
+      setOtp(null);
       Alert.alert("Session Ended", "Attendance session has been closed.");
       fetchHistory();
     } catch (e) {
@@ -388,9 +368,11 @@ export default function TeacherAttendanceScreen() {
       if (filterMonth !== "overall") params.append("month", filterMonth);
       if (filterStudent !== "all") params.append("studentId", filterStudent);
       if (filterType !== "all") params.append("type", filterType);
+      if (filterSession !== "all") params.append("sessionId", filterSession);
 
       const res = await api.get(`/attendance/history?${params.toString()}`);
       setHistory(res.data.history || []);
+      setSessions(res.data.sessions || []);
       setSummary(
         res.data.summary || {
           totalClasses: 0,
@@ -399,7 +381,7 @@ export default function TeacherAttendanceScreen() {
           rate: 0,
         },
       );
-      if (res.data.students && filterStudent === "all") {
+      if (res.data.students && filterStudent === "all" && filterSession === "all") {
         setAllStudents(res.data.students || []);
       }
     } catch (e) {
@@ -407,26 +389,84 @@ export default function TeacherAttendanceScreen() {
     } finally {
       setHistoryLoading(false);
     }
-  }, [activeSubject, filterMonth, filterStudent, filterType]);
+  }, [activeSubject, filterMonth, filterStudent, filterType, filterSession]);
+
+  const handleManualAdd = async (studentId) => {
+    try {
+      await api.post("/attendance/record/add", { sessionId, studentId });
+      fetchOngoingStudents();
+      setSearchQuery("");
+      setShowAddManual(false);
+    } catch (e) {
+      Alert.alert("Error", e.response?.data?.message || "Failed to add student");
+    }
+  };
+
+  const handleRemoveRecord = async (stdId) => {
+    try {
+      await api.delete(`/attendance/record/${sessionId}/${stdId}`);
+      fetchOngoingStudents();
+    } catch (e) {
+      Alert.alert("Error", "Failed to remove record");
+    }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([recoverActiveSession(), fetchHistory()]);
+    setRefreshing(false);
+  };
 
   // ─────────────────────────────────────────
   // RENDER HELPERS
   // ─────────────────────────────────────────
-  const renderHistoryRow = ({ item, index }) => (
-    <View style={[s.tableRow, index % 2 === 0 && s.tableRowAlt]}>
-      <Text style={[s.tableCell, { flex: 1.8 }]}>{item.date}</Text>
-      <Text style={[s.tableCell, { flex: 2.5 }]} numberOfLines={1}>
-        {item.studentName}
-      </Text>
-      <View style={[s.tableCell, { flex: 1.4, alignItems: "center" }]}>
-        <Badge
-          label={item.status}
-          color={item.status === "PRESENT" ? C.success : C.danger}
-          bg={item.status === "PRESENT" ? C.successBg : C.dangerBg}
-        />
+  const renderHistoryRow = ({ item, index }) => {
+    if (item.isSessionRow) {
+      return (
+        <View style={[s.tableRow, index % 2 === 0 && s.tableRowAlt]}>
+          <View style={{ flex: 1.8 }}>
+            <Text style={s.tableCell}>{item.date}</Text>
+            <Text style={{ fontSize: 10, color: C.muted }}>{item.time}</Text>
+          </View>
+          <View style={{ flex: 2.5 }}>
+            <Text style={[s.tableCell, { fontWeight: "700" }]} numberOfLines={1}>
+              {item.topic || "Session Summary"}
+            </Text>
+            <Text style={{ fontSize: 10, color: C.muted }}>{item.sessionType}</Text>
+          </View>
+          <View style={{ flex: 1.4, alignItems: "center" }}>
+            <View style={{ alignItems: "center" }}>
+              <Text style={{ fontSize: 11, fontWeight: "800", color: C.success }}>
+                {item.presentCount}P / {item.absentCount}A
+              </Text>
+              <Text style={{ fontSize: 10, color: C.muted }}>
+                {item.sessionRate}%
+              </Text>
+            </View>
+          </View>
+        </View>
+      );
+    }
+
+    return (
+      <View style={[s.tableRow, index % 2 === 0 && s.tableRowAlt]}>
+        <Text style={[s.tableCell, { flex: 1.8 }]}>{item.date}</Text>
+        <View style={{ flex: 2.5 }}>
+          <Text style={s.tableCell} numberOfLines={1}>
+            {item.studentName}
+          </Text>
+          <Text style={{ fontSize: 10, color: C.muted }}>Roll: {item.studentRoll}</Text>
+        </View>
+        <View style={[s.tableCell, { flex: 1.4, alignItems: "center" }]}>
+          <Badge
+            label={item.status}
+            color={item.status === "PRESENT" ? C.success : C.danger}
+            bg={item.status === "PRESENT" ? C.successBg : C.dangerBg}
+          />
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   // ─────────────────────────────────────────
   // RENDER
@@ -437,6 +477,9 @@ export default function TeacherAttendanceScreen() {
       <ScrollView
         style={s.screen}
         contentContainerStyle={{ paddingBottom: 40 }}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
         {/* PAGE HEADER */}
         <View style={s.pageHeader}>
@@ -553,11 +596,11 @@ export default function TeacherAttendanceScreen() {
             <>
               <SectionHeading
                 title="Session Live"
-                subtitle="Students within Bluetooth range can mark attendance"
+                subtitle="Students can mark attendance using the code below"
               />
 
-              {/* BLE status chip */}
-              <BleStatusChip advertising={advertising} />
+              {/* OTP display */}
+              {otp && <OtpDisplay otp={otp} />}
 
               <InfoRow label="Subject" value={activeSubject?.subjectName} />
               <InfoRow label="Session Type" value={sessionType} />
@@ -584,13 +627,38 @@ export default function TeacherAttendanceScreen() {
               </Text>
 
               <TouchableOpacity
+                style={s.divider}
+                activeOpacity={1}
+              />
+
+              {/* Dynamic marked list */}
+              <View style={{ marginVertical: 10 }}>
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                  <Text style={[s.fieldLabel, { marginTop: 0 }]}>Marked Students ({ongoingStudents.length})</Text>
+                  <TouchableOpacity onPress={() => setShowAddManual(true)}>
+                    <Text style={{ color: C.accent, fontWeight: "700", fontSize: 12 }}>+ Manual Add</Text>
+                  </TouchableOpacity>
+                </View>
+                {ongoingStudents.length === 0 ? (
+                  <Text style={{ fontSize: 12, color: C.muted, fontStyle: "italic", textAlign: "center", padding: 10 }}>Waiting for students...</Text>
+                ) : (
+                  ongoingStudents.map((rec) => (
+                    <View key={rec._id} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: "#f0f0f0" }}>
+                      <Text style={{ fontSize: 14, color: C.text, fontWeight: "500" }}>{rec.student?.rollNumber} - {rec.student?.firstName}</Text>
+                      <TouchableOpacity onPress={() => handleRemoveRecord(rec.student?._id)}>
+                        <Text style={{ color: C.danger, fontSize: 12, fontWeight: "600" }}>Remove</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))
+                )}
+              </View>
+
+              <TouchableOpacity
                 style={s.dangerBtn}
                 onPress={handleCloseSession}
                 activeOpacity={0.85}
               >
-                <Text style={s.dangerBtnText}>
-                  ⏹ End Session &amp; Stop BLE
-                </Text>
+                <Text style={s.dangerBtnText}>⏹ End Session</Text>
               </TouchableOpacity>
             </>
           )}
@@ -669,7 +737,7 @@ export default function TeacherAttendanceScreen() {
                   onValueChange={setFilterType}
                   style={s.picker}
                 >
-                  <Picker.Item label="All" value="all" />
+                  <Picker.Item label="All" value="all" color="#6b7280" />
                   {SESSION_TYPES.map((t) => (
                     <Picker.Item key={t} label={t} value={t} />
                   ))}
@@ -688,12 +756,34 @@ export default function TeacherAttendanceScreen() {
                   onValueChange={setFilterStudent}
                   style={s.picker}
                 >
-                  <Picker.Item label="All Students" value="all" />
+                  <Picker.Item
+                    label="All Students"
+                    value="all"
+                    color="#6b7280"
+                  />
                   {allStudents.map((st) => (
                     <Picker.Item
                       key={st._id}
-                      label={`${st.name} (${st.roll})`}
+                      label={`${st.roll} - ${st.name}`}
                       value={st._id}
+                    />
+                  ))}
+                </Picker>
+              </View>
+
+              <Text style={s.fieldLabel}>Session</Text>
+              <View style={s.pickerWrap}>
+                <Picker
+                  selectedValue={filterSession}
+                  onValueChange={setFilterSession}
+                  style={s.picker}
+                >
+                  <Picker.Item label="All Sessions" value="all" color="#6b7280" />
+                  {sessions.map((sess) => (
+                    <Picker.Item
+                      key={sess._id}
+                      label={`${sess.date} - ${sess.type}`}
+                      value={sess._id}
                     />
                   ))}
                 </Picker>
@@ -719,7 +809,7 @@ export default function TeacherAttendanceScreen() {
                 <Text style={[s.tableHeadCell, { flex: 1.8 }]}>Date</Text>
                 <Text style={[s.tableHeadCell, { flex: 2.5 }]}>Student</Text>
                 <Text
-                  style={[s.tableHeadCell, { flex: 1.2, textAlign: "center" }]}
+                  style={[s.tableHeadCell, { flex: 1.4, textAlign: "center" }]}
                 >
                   Status
                 </Text>
@@ -734,6 +824,97 @@ export default function TeacherAttendanceScreen() {
           )}
         </View>
       </ScrollView>
+
+      {/* Manual Add Overlay */}
+      {showAddManual && (
+        <View
+          style={{
+            ...StyleSheet.absoluteFillObject,
+            backgroundColor: "rgba(0,0,0,0.6)",
+            justifyContent: "center",
+            padding: 20,
+            zIndex: 1000,
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: "#FFF",
+              borderRadius: 20,
+              padding: 20,
+              maxHeight: "80%",
+            }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                justifyContent: "space-between",
+                marginBottom: 20,
+              }}
+            >
+              <Text style={{ fontSize: 18, fontWeight: "800", color: C.primary }}>
+                Manual Attendance
+              </Text>
+              <TouchableOpacity onPress={() => setShowAddManual(false)}>
+                <Text style={{ color: C.danger, fontWeight: "700" }}>Close</Text>
+              </TouchableOpacity>
+            </View>
+
+            <TextInput
+              style={s.textInput}
+              placeholder="Search by name or roll number..."
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoFocus
+            />
+
+            <FlatList
+              data={allStudents.filter(
+                (st) =>
+                  st.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  st.roll.toLowerCase().includes(searchQuery.toLowerCase()),
+              )}
+              keyExtractor={(st) => st._id}
+              style={{ marginTop: 15 }}
+              renderItem={({ item: st }) => (
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    alignItems: "center",
+                    paddingVertical: 12,
+                    borderBottomWidth: 1,
+                    borderBottomColor: "#EEE",
+                  }}
+                >
+                  <View>
+                    <Text style={{ fontWeight: "700", color: C.text }}>
+                      {st.name}
+                    </Text>
+                    <Text style={{ fontSize: 12, color: C.muted }}>
+                      Roll: {st.roll}
+                    </Text>
+                  </View>
+                  <TouchableOpacity
+                    style={{
+                      backgroundColor: C.accent,
+                      paddingHorizontal: 12,
+                      paddingVertical: 6,
+                      borderRadius: 6,
+                    }}
+                    onPress={() => handleManualAdd(st._id)}
+                  >
+                    <Text
+                      style={{ color: "#FFF", fontSize: 12, fontWeight: "700" }}
+                    >
+                      Add
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            />
+          </View>
+        </View>
+      )}
     </>
   );
 }
@@ -743,6 +924,7 @@ export default function TeacherAttendanceScreen() {
 // ─────────────────────────────────────────────
 const s = StyleSheet.create({
   screen: {
+    color: "#000",
     flex: 1,
     backgroundColor: C.bg,
     paddingHorizontal: 16,
@@ -795,6 +977,52 @@ const s = StyleSheet.create({
     marginBottom: 14,
     gap: 8,
   },
+  otpContainer: {
+    alignItems: "center",
+    marginVertical: 20,
+    backgroundColor: C.bg,
+    padding: 20,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: C.border,
+  },
+  otpLabel: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: C.muted,
+    marginBottom: 12,
+    letterSpacing: 1,
+  },
+  otpBox: {
+    flexDirection: "row",
+    gap: 12,
+    marginBottom: 12,
+  },
+  otpDigitBox: {
+    width: 50,
+    height: 60,
+    backgroundColor: C.surface,
+    borderRadius: 10,
+    justifyContent: "center",
+    alignItems: "center",
+    borderWidth: 2,
+    borderColor: C.accent,
+    elevation: 3,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  otpDigit: {
+    fontSize: 28,
+    fontWeight: "800",
+    color: C.primary,
+  },
+  otpSubtext: {
+    fontSize: 12,
+    color: C.muted,
+    fontStyle: "italic",
+  },
   bleChipIcon: { fontSize: 16 },
   bleChipText: {
     fontSize: 13,
@@ -819,7 +1047,7 @@ const s = StyleSheet.create({
     letterSpacing: -0.3,
   },
   headingSub: {
-    fontSize: 12,
+    fontSize: 20,
     color: C.muted,
     marginTop: 3,
   },

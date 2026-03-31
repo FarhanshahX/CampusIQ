@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Linking,
+  RefreshControl,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import api, { API_BASE_URL } from "../../api/axios";
@@ -157,10 +158,13 @@ const ResourceCard = ({ item }) => {
 // ─── Main Screen ──────────────────────────────────────────────────────────────
 
 export default function StudentResourceScreen() {
-  const [subjects, setSubjects] = useState(["All Subjects"]);
+  const [subjects, setSubjects] = useState([
+    { _id: "all", subjectName: "Select a subject" },
+  ]);
   const [selectedSubject, setSelectedSubject] = useState(subjects[0]);
   const [resources, setResources] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   const { user } = useAuth();
   const studentId = user._id;
@@ -170,23 +174,33 @@ export default function StudentResourceScreen() {
     try {
       const res = await api.get(`/subjects/${deptId}`);
       const subs = res.data || [];
-      setSubjects(res.data);
+      setSubjects([{ _id: "all", subjectName: "Select a subject" }, ...subs]);
     } catch (err) {
       console.log(err);
     }
   }, []);
 
-  const fetchResources = useCallback(async (subjectId) => {
-    setLoading(true);
-    try {
-      const res = await api.get(`/resources/subject/${subjectId}`);
-      setResources(res.data || []);
-    } catch (err) {
-      console.log(err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const fetchResources = useCallback(
+    async (subjectId) => {
+      setLoading(true);
+      try {
+        const params = {};
+        if (subjectId === "all") {
+          params.departmentId = departmentId;
+        }
+
+        const res = await api.get(`/resources/subject/${subjectId}`, {
+          params,
+        });
+        setResources(res.data || []);
+      } catch (err) {
+        console.log(err);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [departmentId],
+  );
 
   useEffect(() => {
     fetchSubjects(departmentId);
@@ -195,6 +209,15 @@ export default function StudentResourceScreen() {
   useEffect(() => {
     fetchResources(selectedSubject._id);
   }, [selectedSubject]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await Promise.all([
+      fetchSubjects(departmentId),
+      fetchResources(selectedSubject._id),
+    ]);
+    setRefreshing(false);
+  };
 
   return (
     <View style={styles.screen}>
@@ -211,6 +234,9 @@ export default function StudentResourceScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
         {/* ── Subject Filter ── */}
         <View style={styles.filterCard}>
@@ -240,7 +266,7 @@ export default function StudentResourceScreen() {
                 </Text>
               </View>
               <Text style={styles.countLabel}>
-                {selectedSubject === "All Subjects"
+                {selectedSubject._id === "all"
                   ? "across all subjects"
                   : `for ${selectedSubject.subjectName}`}
               </Text>
@@ -279,7 +305,7 @@ export default function StudentResourceScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: "#F7F8FA" },
+  screen: { color: "#000", flex: 1, backgroundColor: "#F7F8FA" },
 
   // Header
   header: {

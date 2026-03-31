@@ -1,23 +1,24 @@
 const Resource = require("../models/resource");
 
 exports.createResource = async (req, res) => {
-  console.log("reached here");
   try {
     const { title, description, subjectId, teacherId } = req.body;
-    console.log("Received resource creation request: ", req.body);
 
     const file = req.file;
-    console.log("Received file: ", file);
 
     if (!file) {
       return res.status(400).json({ message: "File is required" });
     }
+
+    const Teacher = require("../models/Teacher");
+    const teacher = await Teacher.findById(teacherId);
 
     const resource = await Resource.create({
       title,
       description,
       subjectId,
       teacherId,
+      department: teacher ? teacher.department : null,
       fileUrl: `/uploads/resources/${file.filename}`,
       fileName: file.originalname,
       fileSize: file.size,
@@ -38,8 +39,16 @@ exports.createResource = async (req, res) => {
 exports.getResourcesBySubject = async (req, res) => {
   try {
     const { subjectId } = req.params;
+    const { departmentId } = req.query;
 
-    const resources = await Resource.find({ subjectId }).sort({
+    let query = {};
+    if (subjectId !== "all") {
+      query.subjectId = subjectId;
+    } else if (departmentId) {
+      query.department = departmentId;
+    }
+
+    const resources = await Resource.find(query).sort({
       createdAt: -1,
     });
 

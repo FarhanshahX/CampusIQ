@@ -242,6 +242,7 @@ const ProfileScreen = () => {
                 value={firstName}
                 onChangeText={setFirstName}
                 placeholder="Enter first name"
+                placeholderTextColor="#6B7280"
               />
             </View>
 
@@ -252,6 +253,7 @@ const ProfileScreen = () => {
                 value={lastName}
                 onChangeText={setLastName}
                 placeholder="Enter last name"
+                placeholderTextColor="#6B7280"
               />
             </View>
 
@@ -263,6 +265,7 @@ const ProfileScreen = () => {
                 onChangeText={setMobile}
                 keyboardType="phone-pad"
                 placeholder="Enter mobile number"
+                placeholderTextColor="#6B7280"
               />
             </View>
 
@@ -370,6 +373,7 @@ const ProfileScreen = () => {
                     onChangeText={(text) => handleCgpaChange(text, index)}
                     keyboardType="numeric"
                     placeholder="0.0"
+                    placeholderTextColor={"#6b7280"}
                   />
                 </View>
               ))}
@@ -433,6 +437,7 @@ const ProfileScreen = () => {
                 onChangeText={setCurrentPassword}
                 secureTextEntry
                 placeholder="Enter current password"
+                placeholderTextColor="#6B7280"
               />
             </View>
 
@@ -444,6 +449,7 @@ const ProfileScreen = () => {
                 onChangeText={setNewPassword}
                 secureTextEntry
                 placeholder="Enter new password"
+                placeholderTextColor="#6B7280"
               />
             </View>
 
@@ -455,6 +461,7 @@ const ProfileScreen = () => {
                 onChangeText={setConfirmPassword}
                 secureTextEntry
                 placeholder="Confirm new password"
+                placeholderTextColor="#6B7280"
               />
             </View>
 
@@ -494,6 +501,7 @@ const ProfileScreen = () => {
 
 const styles = StyleSheet.create({
   container: {
+    color: "#000",
     flex: 1,
     backgroundColor: "#F3F4F6",
   },

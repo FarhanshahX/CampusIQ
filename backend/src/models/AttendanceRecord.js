@@ -1,35 +1,3 @@
-// const mongoose = require("mongoose");
-
-// const attendanceRecordSchema = new mongoose.Schema(
-//   {
-//     session: {
-//       type: mongoose.Schema.Types.ObjectId,
-//       ref: "AttendanceSession",
-//       required: true,
-//     },
-
-//     student: {
-//       type: mongoose.Schema.Types.ObjectId,
-//       ref: "Student",
-//       required: true,
-//     },
-
-//     markedAt: {
-//       type: Date,
-//       default: Date.now,
-//     },
-
-//     status: {
-//       type: String,
-//       enum: ["present"],
-//       default: "present",
-//     },
-//   },
-//   { timestamps: true },
-// );
-
-// module.exports = mongoose.model("AttendanceRecord", attendanceRecordSchema);
-
 const mongoose = require("mongoose");
 
 const attendanceRecordSchema = new mongoose.Schema(

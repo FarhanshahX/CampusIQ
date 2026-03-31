@@ -7,6 +7,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
+  RefreshControl,
 } from "react-native";
 import { Picker } from "@react-native-picker/picker";
 import api from "../../api/axios";
@@ -95,6 +96,7 @@ export default function ScoresScreen() {
   // selectedSubject should be set once we have subjects available
   const [selectedSubject, setSelectedSubject] = useState("");
   const [fetching, setFetching] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [isLocked, setIsLocked] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -227,6 +229,17 @@ export default function ScoresScreen() {
     [user._id, selectedSubject],
   );
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    if (departmentId) {
+      await fetchSubjects(departmentId);
+    }
+    if (selectedSubject) {
+      await fetchScores(selectedSubject);
+    }
+    setRefreshing(false);
+  };
+
   const saveScores = async () => {
     setSaving(true);
     try {
@@ -320,6 +333,9 @@ export default function ScoresScreen() {
       style={styles.container}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
     >
       {/* Page Header */}
       <View style={styles.pageHeader}>
@@ -429,7 +445,8 @@ export default function ScoresScreen() {
             note="Based on your attendance record"
           />
           <View style={styles.rowDivider} />
-          {currentSubjectType === "Theory+Lab+Practical" && (
+          {(currentSubjectType === "Theory+Lab+Practical" ||
+            currentSubjectType === "Lab+Practical") && (
             <ReadOnlyRow
               label="Practical / Oral"
               value={practical}
@@ -507,7 +524,7 @@ export default function ScoresScreen() {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F7F8FA" },
+  container: { color: "#000", flex: 1, backgroundColor: "#F7F8FA" },
   content: { padding: 20 },
 
   // Page Header

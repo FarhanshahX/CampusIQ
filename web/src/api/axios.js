@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: "http://localhost:5000/api",
+  baseURL: "https://campusiq-backend.onrender.com/api",
 });
 
 export const API_BASE_URL = api.defaults.baseURL.replace("/api", "");

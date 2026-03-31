@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   TouchableOpacity,
   Dimensions,
+  RefreshControl,
 } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 import api from "../../api/axios";
@@ -113,6 +114,7 @@ export default function TeacherDashboard() {
   const { user, activeSubject } = useAuth();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const navigation = useNavigation();
 
@@ -134,6 +136,12 @@ export default function TeacherDashboard() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchDashboardData();
+    setRefreshing(false);
   };
 
   const scoreBuckets = useMemo(() => {
@@ -210,6 +218,9 @@ export default function TeacherDashboard() {
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
       >
         {/* Header */}
         <View style={styles.headerSection}>
@@ -430,7 +441,7 @@ export default function TeacherDashboard() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#F8FAFC" },
+  container: { color: "#000", flex: 1, backgroundColor: "#F8FAFC" },
   flexCenter: { flex: 1, backgroundColor: "#F8FAFC" },
   scrollContent: { padding: 20 },
 
